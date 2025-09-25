@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"simple_blockchain/pkg/blockchain"
 	"simple_blockchain/pkg/crypto"
@@ -88,8 +87,6 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 
 func (handler *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 	transactions := handler.Mempool.GetTransactions()
-
-	fmt.Println(transactions)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{

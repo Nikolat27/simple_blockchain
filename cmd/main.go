@@ -52,10 +52,14 @@ func main() {
 			}
 		}
 	}
-
 	nodeAddr := "localhost:" + *nodePort
 	p2pNode := p2p.NewNode(nodeAddr, newBc, newMempool, store)
 	p2pNode.StartMessageProcessor()
+
+	// Set up callback for broadcasting newly mined blocks
+	newBc.SetOnBlockMined(func(block *blockchain.Block) {
+		p2pNode.BroadcastBlock(block)
+	})
 
 	// Load saved peers
 	p2pNode.LoadPeersFromStorage()
@@ -77,6 +81,7 @@ func main() {
 
 	if err := p2pServer.Start(*nodePort); err != nil {
 		log.Printf("Failed to start p2p server: %v\n", err)
+		return
 	}
 
 	// Start periodic saving

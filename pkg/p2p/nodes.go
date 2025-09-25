@@ -81,7 +81,7 @@ func (node *Node) savePeersToStorage() {
 		return
 	}
 
-	node.peerMutex.RLock()
+	// Note: This function assumes the caller already holds the peerMutex
 	peerData := make(map[string]*storage.PeerData)
 	for addr, peer := range node.Peers {
 		peerData[addr] = &storage.PeerData{
@@ -90,11 +90,8 @@ func (node *Node) savePeersToStorage() {
 			Connected: peer.Connected,
 		}
 	}
-	node.peerMutex.RUnlock()
 
-	if err := node.Storage.SavePeers(peerData); err != nil {
-		fmt.Printf("Error saving peers: %v\n", err)
-	}
+	node.Storage.SavePeers(peerData)
 }
 
 func (node *Node) LoadPeersFromStorage() {
@@ -322,31 +319,23 @@ func (node *Node) handleBlockMessage(msg *Message) {
 		return
 	}
 
-	blocks := node.Blockchain.GetBlocks()
-	if len(blocks) == 0 {
-		fmt.Println("No blocks in chain to compare")
+	// Use AcceptBlock which implements longest chain rule
+	if node.Blockchain.AcceptBlock(block) {
+		fmt.Printf("✅ Accepted block %d from peer %s (hash: %x)\n",
+			block.Index, msg.From, block.Hash[:8])
+
+		// Clear mempool if we added to main chain (simplified - in full implementation
+		// we should check if any transactions became invalid)
+		node.Mempool.Clear()
+
+		// Stop any ongoing mining since we received a new block
+		node.Blockchain.StopMining()
+
+		node.broadcastBlockToPeersExcept(block, msg.From)
+	} else {
+		fmt.Printf("❌ Rejected block %d from peer %s\n", block.Index, msg.From)
 		return
 	}
-
-	latestBlock := blocks[len(blocks)-1]
-	if hex.EncodeToString(block.PrevHash) != hex.EncodeToString(latestBlock.Hash) {
-		fmt.Printf("Block prevHash doesn't match latest block. Expected: %x, Got: %x\n",
-			latestBlock.Hash, block.PrevHash)
-		return
-	}
-
-	if block.Index != latestBlock.Index+1 {
-		fmt.Printf("Block index mismatch. Expected: %d, Got: %d\n",
-			latestBlock.Index+1, block.Index)
-		return
-	}
-
-	node.Blockchain.AddBlock(block)
-	node.Mempool.Clear()
-
-	fmt.Printf("✅ Added block %d from peer %s (hash: %x)\n",
-		block.Index, msg.From, block.Hash[:8])
-	node.broadcastBlockToPeersExcept(block, msg.From)
 }
 
 func (node *Node) broadcastBlockToPeersExcept(block *blockchain.Block, excludeAddr string) {
