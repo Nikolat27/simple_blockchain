@@ -25,9 +25,12 @@ func main() {
 	genesisAddress := *genesisAddr
 
 	// Initialize storage
-	store := storage.NewStorage(*dataDir)
+	store, err := storage.NewStorage(*dataDir)
+	if err != nil {
+		log.Printf("ERROR creating new storage: %v\n", err)
+		return
+	}
 
-	// Try to load existing blockchain and mempool
 	var newBc *blockchain.Blockchain
 	var newMempool *blockchain.Mempool
 
