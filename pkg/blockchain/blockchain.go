@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"bytes"
 	"encoding/hex"
 	"sync"
 	"time"
@@ -18,22 +19,15 @@ func NewBlockchain(genesisAddress string) *Blockchain {
 		Blocks: make([]Block, 0),
 	}
 
-	genesisTx := Transaction{
+	genesisTx := &Transaction{
 		To:         genesisAddress,
 		Amount:     1000,
 		Status:     "confirmed",
 		IsCoinbase: true,
 	}
 
-	genesisBlock := &Block{
-		Index:        0,
-		PrevHash:     make([]byte, 32),
-		Timestamp:    time.Now(),
-		Transactions: []Transaction{genesisTx},
-		Nonce:        0,
-	}
+	genesisBlock := createGenesisBlock(genesisTx)
 
-	genesisBlock.HashBlock()
 	bc.Blocks = append(bc.Blocks, *genesisBlock)
 
 	return bc
@@ -42,48 +36,63 @@ func NewBlockchain(genesisAddress string) *Blockchain {
 func (bc *Blockchain) AddBlock(newBlock *Block) {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
+
 	bc.Blocks = append(bc.Blocks, *newBlock)
 }
 
 func (bc *Blockchain) GetBlocks() []Block {
 	bc.mu.RLock()
 	defer bc.mu.RUnlock()
+
 	blocksCopy := make([]Block, len(bc.Blocks))
 	copy(blocksCopy, bc.Blocks)
+
 	return blocksCopy
 }
 
 func (bc *Blockchain) MineBlock(mempool *Mempool, minerAddress string) *Block {
-	transactions := mempool.GetTransactions()
+	for {
+		transactions := mempool.GetTransactions()
 
-	coinBaseTx := Transaction{
-		To:         minerAddress,
-		Amount:     MiningReward,
-		Status:     "confirmed",
-		IsCoinbase: true,
+		coinBaseTx := Transaction{
+			To:         minerAddress,
+			Amount:     MiningReward,
+			Status:     "confirmed",
+			IsCoinbase: true,
+		}
+
+		allTransactions := append([]Transaction{coinBaseTx}, transactions...)
+
+		bc.mu.RLock()
+		prevHash := getPreviousBlockHash(bc.Blocks)
+		blockIndex := len(bc.Blocks)
+		bc.mu.RUnlock()
+
+		newBlock := &Block{
+			Index:        blockIndex,
+			PrevHash:     prevHash,
+			Timestamp:    time.Now(),
+			Transactions: allTransactions,
+			Nonce:        0,
+		}
+
+		proofOfWork(newBlock)
+
+		bc.mu.RLock()
+		currentTip := getPreviousBlockHash(bc.Blocks)
+		isBlockMined := !bytes.Equal(currentTip, newBlock.PrevHash)
+		bc.mu.RUnlock()
+
+		if isBlockMined {
+			// Somebody else mined the block first → try mining again
+			continue
+		}
+
+		bc.AddBlock(newBlock)
+		mempool.Clear()
+
+		return newBlock
 	}
-
-	allTransactions := append([]Transaction{coinBaseTx}, transactions...)
-
-	bc.mu.RLock()
-	prevHash := getPreviousBlockHash(bc.Blocks)
-	blockIndex := len(bc.Blocks)
-	bc.mu.RUnlock()
-
-	newBlock := &Block{
-		Index:        blockIndex,
-		PrevHash:     prevHash,
-		Timestamp:    time.Now(),
-		Transactions: allTransactions,
-		Nonce:        0,
-	}
-
-	proofOfWork(newBlock)
-
-	bc.AddBlock(newBlock)
-	mempool.Clear()
-
-	return newBlock
 }
 
 func getPreviousBlockHash(blocks []Block) []byte {
@@ -153,4 +162,17 @@ func (bc *Blockchain) ValidateTransaction(tx *Transaction) bool {
 
 	balance := bc.GetBalance(tx.From)
 	return balance >= tx.Amount
+}
+
+func createGenesisBlock(genesisTx *Transaction) *Block {
+	block := &Block{
+		Index:        0,
+		PrevHash:     make([]byte, 32),
+		Timestamp:    time.Now(),
+		Transactions: []Transaction{*genesisTx},
+		Nonce:        0,
+	}
+
+	block.HashBlock()
+	return block
 }
