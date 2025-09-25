@@ -33,7 +33,9 @@ type Node struct {
 	peerMutex sync.RWMutex
 }
 
-func NewNode(address string, blockchain *blockchain.Blockchain, mempool *blockchain.Mempool, storage *storage.Storage) *Node {
+func NewNode(address string, blockchain *blockchain.Blockchain, mempool *blockchain.Mempool,
+	storage *storage.Storage) *Node {
+
 	return &Node{
 		ID:         generateNodeID(),
 		Address:    address,
@@ -45,124 +47,131 @@ func NewNode(address string, blockchain *blockchain.Blockchain, mempool *blockch
 	}
 }
 
-func (n *Node) AddPeer(address string) {
-	n.peerMutex.Lock()
-	defer n.peerMutex.Unlock()
+func (node *Node) AddPeer(address string) {
+	node.peerMutex.Lock()
+	defer node.peerMutex.Unlock()
 
-	n.Peers[address] = &Peer{
+	node.Peers[address] = &Peer{
 		Address:   address,
 		LastSeen:  time.Now(),
 		Connected: false,
 	}
-	n.savePeersToStorage()
+	node.savePeersToStorage()
 }
 
-func (n *Node) savePeersToStorage() {
-	if n.Storage == nil {
+func (node *Node) savePeersToStorage() {
+	if node.Storage == nil {
 		return
 	}
 
-	n.peerMutex.RLock()
+	node.peerMutex.RLock()
 	peerData := make(map[string]*storage.PeerData)
-	for addr, peer := range n.Peers {
+	for addr, peer := range node.Peers {
 		peerData[addr] = &storage.PeerData{
 			Address:   peer.Address,
 			LastSeen:  peer.LastSeen,
 			Connected: peer.Connected,
 		}
 	}
-	n.peerMutex.RUnlock()
+	node.peerMutex.RUnlock()
 
-	if err := n.Storage.SavePeers(peerData); err != nil {
+	if err := node.Storage.SavePeers(peerData); err != nil {
 		fmt.Printf("Error saving peers: %v\n", err)
 	}
 }
 
-func (n *Node) LoadPeersFromStorage() {
-	if n.Storage == nil {
+func (node *Node) LoadPeersFromStorage() {
+	if node.Storage == nil {
 		return
 	}
 
-	peerData, err := n.Storage.LoadPeers()
+	peerData, err := node.Storage.LoadPeers()
 	if err != nil {
 		fmt.Printf("Error loading peers: %v\n", err)
 		return
 	}
 
-	n.peerMutex.Lock()
+	node.peerMutex.Lock()
 	for addr, data := range peerData {
-		n.Peers[addr] = &Peer{
+		node.Peers[addr] = &Peer{
 			Address:   data.Address,
 			LastSeen:  data.LastSeen,
 			Connected: data.Connected,
 		}
 	}
-	n.peerMutex.Unlock()
+	node.peerMutex.Unlock()
 }
 
-func (n *Node) ConnectToPeer(address string) error {
+func (node *Node) ConnectToPeer(address string) error {
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
 		return err
 	}
 
-	n.peerMutex.Lock()
-	if peer, exists := n.Peers[address]; exists {
+	node.peerMutex.Lock()
+	if peer, exists := node.Peers[address]; exists {
 		peer.Connected = true
 		peer.LastSeen = time.Now()
 		peer.conn = conn
 	}
-	n.peerMutex.Unlock()
-	n.savePeersToStorage()
+	node.peerMutex.Unlock()
+	node.savePeersToStorage()
 
-	go n.handleConnection(conn)
+	go node.handleConnection(conn)
 
 	return nil
 }
 
-func (n *Node) handleConnection(conn net.Conn) {
+func (node *Node) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
+		var connReceivedData = scanner.Bytes()
+
 		var msg Message
-		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
+		if err := parseMessage(connReceivedData, &msg); err != nil {
 			fmt.Printf("Error parsing message: %v\n", err)
 			continue
 		}
 
 		// Register/update inbound peer based on message source
 		if msg.From != "" {
-			n.peerMutex.Lock()
-			if peer, exists := n.Peers[msg.From]; exists {
+			node.peerMutex.Lock()
+			if peer, exists := node.Peers[msg.From]; exists {
 				peer.Connected = true
 				peer.LastSeen = time.Now()
 				peer.conn = conn
 			} else {
-				n.Peers[msg.From] = &Peer{
+				node.Peers[msg.From] = &Peer{
 					Address:   msg.From,
 					LastSeen:  time.Now(),
 					Connected: true,
 					conn:      conn,
 				}
 			}
-			n.peerMutex.Unlock()
-			n.savePeersToStorage()
+			node.peerMutex.Unlock()
+			node.savePeersToStorage()
 		}
 
 		select {
-		case n.MessageCh <- &msg:
+		case node.MessageCh <- &msg:
+			// send the received msg to the node message channel
 		default:
 			fmt.Println("Message channel full, dropping message")
 		}
 	}
 }
 
-func (n *Node) SendMessage(address string, msg *Message) error {
-	n.peerMutex.RLock()
+func parseMessage(receivedMsg []byte, msg *Message) error {
+	return json.Unmarshal(receivedMsg, msg)
+}
 
-	peer, exists := n.Peers[address]
-	n.peerMutex.RUnlock()
+func (node *Node) SendMessage(address string, msg *Message) error {
+	node.peerMutex.RLock()
+
+	peer, exists := node.Peers[address]
+	node.peerMutex.RUnlock()
 
 	if !exists || !peer.Connected || peer.conn == nil {
 		return fmt.Errorf("peer not connected: %s", address)
@@ -177,11 +186,11 @@ func (n *Node) SendMessage(address string, msg *Message) error {
 	return err
 }
 
-func (n *Node) BroadcastMessage(msg *Message) {
-	n.peerMutex.RLock()
-	defer n.peerMutex.RUnlock()
+func (node *Node) BroadcastMessage(msg *Message) {
+	node.peerMutex.RLock()
+	defer node.peerMutex.RUnlock()
 
-	for _, peer := range n.Peers {
+	for _, peer := range node.Peers {
 		if peer.Connected && peer.conn != nil {
 			data, err := json.Marshal(msg)
 			if err != nil {
@@ -202,36 +211,36 @@ func generateNodeID() string {
 	return hex.EncodeToString(b)
 }
 
-func (n *Node) StartMessageProcessor() {
+func (node *Node) StartMessageProcessor() {
 	go func() {
-		for msg := range n.MessageCh {
-			n.processMessage(msg)
+		for msg := range node.MessageCh {
+			node.processMessage(msg)
 		}
 	}()
 }
 
-func (n *Node) processMessage(msg *Message) {
+func (node *Node) processMessage(msg *Message) {
 	switch msg.Type {
 	case MsgTransaction:
-		n.handleTransactionMessage(msg)
+		node.handleTransactionMessage(msg)
 	case MsgBlock:
-		n.handleBlockMessage(msg)
+		node.handleBlockMessage(msg)
 	case MsgPeers:
-		n.handlePeersMessage(msg)
+		node.handlePeersMessage(msg)
 	case MsgBlockchainReq:
-		n.respondToBlockchainRequest(msg)
+		node.respondToBlockchainRequest(msg)
 	case MsgBlockchainRsp:
-		n.handleBlockchainResponse(msg)
+		node.handleBlockchainResponse(msg)
 	case MsgBlockReq:
-		n.respondToBlockRequest(msg)
+		node.respondToBlockRequest(msg)
 	case MsgBlockRsp:
-		n.handleBlockResponse(msg)
+		node.handleBlockResponse(msg)
 	default:
 		fmt.Printf("Unknown message type: %s\n", msg.Type)
 	}
 }
 
-func (n *Node) handleTransactionMessage(msg *Message) {
+func (node *Node) handleTransactionMessage(msg *Message) {
 	txData, ok := msg.Payload.(map[string]any)
 	if !ok {
 		fmt.Println("Invalid transaction payload")
@@ -270,33 +279,33 @@ func (n *Node) handleTransactionMessage(msg *Message) {
 		IsCoinbase: false,
 	}
 
-	if tx.Verify() && n.Blockchain.ValidateTransaction(tx) {
-		n.Mempool.AddTransaction(tx)
+	if tx.Verify() && node.Blockchain.ValidateTransaction(tx) {
+		node.Mempool.AddTransaction(tx)
 		fmt.Printf("Added transaction from p2p: %s -> %s (%d)\n", from, to, amount)
 	} else {
 		fmt.Println("Invalid transaction received via p2p")
 	}
 }
 
-func (n *Node) handleBlockMessage(msg *Message) {
+func (node *Node) handleBlockMessage(msg *Message) {
 	blockMap, ok := msg.Payload.(map[string]any)
 	if !ok {
 		fmt.Println("Invalid block payload")
 		return
 	}
 
-	block := n.reconstructBlockFromMap(blockMap)
+	block := node.reconstructBlockFromMap(blockMap)
 	if block == nil {
 		fmt.Println("Invalid block structure")
 		return
 	}
 
-	if !n.Blockchain.VerifyBlock(block) {
+	if !node.Blockchain.VerifyBlock(block) {
 		fmt.Println("Received invalid block from peer")
 		return
 	}
 
-	blocks := n.Blockchain.GetBlocks()
+	blocks := node.Blockchain.GetBlocks()
 	if len(blocks) == 0 {
 		fmt.Println("No blocks in chain to compare")
 		return
@@ -315,26 +324,26 @@ func (n *Node) handleBlockMessage(msg *Message) {
 		return
 	}
 
-	n.Blockchain.AddBlock(block)
-	n.Mempool.Clear()
+	node.Blockchain.AddBlock(block)
+	node.Mempool.Clear()
 
 	fmt.Printf("✅ Added block %d from peer %s (hash: %x)\n",
 		block.Index, msg.From, block.Hash[:8])
-	n.broadcastBlockToPeersExcept(block, msg.From)
+	node.broadcastBlockToPeersExcept(block, msg.From)
 }
 
-func (n *Node) broadcastBlockToPeersExcept(block *blockchain.Block, excludeAddr string) {
-	n.peerMutex.RLock()
-	defer n.peerMutex.RUnlock()
+func (node *Node) broadcastBlockToPeersExcept(block *blockchain.Block, excludeAddr string) {
+	node.peerMutex.RLock()
+	defer node.peerMutex.RUnlock()
 
 	msg := &Message{
 		Type:      MsgBlock,
 		Payload:   block,
-		From:      n.Address,
+		From:      node.Address,
 		Timestamp: time.Now().Unix(),
 	}
 
-	for addr, peer := range n.Peers {
+	for addr, peer := range node.Peers {
 		if addr != excludeAddr && peer.Connected && peer.conn != nil {
 			data, err := json.Marshal(msg)
 			if err != nil {
@@ -352,10 +361,10 @@ type BlockchainSyncInfo struct {
 	LatestBlockHash   string `json:"latest_block_hash"`
 }
 
-func (n *Node) SyncBlockchain() {
-	n.peerMutex.RLock()
-	peerCount := len(n.Peers)
-	n.peerMutex.RUnlock()
+func (node *Node) SyncBlockchain() {
+	node.peerMutex.RLock()
+	peerCount := len(node.Peers)
+	node.peerMutex.RUnlock()
 
 	if peerCount == 0 {
 		fmt.Println("No peers available for blockchain sync")
@@ -363,26 +372,26 @@ func (n *Node) SyncBlockchain() {
 	}
 
 	fmt.Println("🔄 Starting blockchain synchronization...")
-	n.requestBlockchainInfo()
+	node.requestBlockchainInfo()
 	time.Sleep(2 * time.Second)
 
-	localHeight := len(n.Blockchain.GetBlocks()) - 1
+	localHeight := len(node.Blockchain.GetBlocks()) - 1
 	fmt.Printf("📊 Local blockchain height: %d\n", localHeight)
 }
 
-func (n *Node) requestBlockchainInfo() {
+func (node *Node) requestBlockchainInfo() {
 	msg := &Message{
 		Type:      MsgBlockchainReq,
 		Payload:   "status",
-		From:      n.Address,
+		From:      node.Address,
 		Timestamp: time.Now().Unix(),
 	}
 
-	n.BroadcastMessage(msg)
+	node.BroadcastMessage(msg)
 }
 
-func (n *Node) respondToBlockchainRequest(msg *Message) {
-	blocks := n.Blockchain.GetBlocks()
+func (node *Node) respondToBlockchainRequest(msg *Message) {
+	blocks := node.Blockchain.GetBlocks()
 	latestBlock := blocks[len(blocks)-1]
 
 	info := BlockchainSyncInfo{
@@ -393,14 +402,14 @@ func (n *Node) respondToBlockchainRequest(msg *Message) {
 	responseMsg := &Message{
 		Type:      MsgBlockchainRsp,
 		Payload:   info,
-		From:      n.Address,
+		From:      node.Address,
 		Timestamp: time.Now().Unix(),
 	}
 
-	n.SendMessage(msg.From, responseMsg)
+	node.SendMessage(msg.From, responseMsg)
 }
 
-func (n *Node) handleBlockchainResponse(msg *Message) {
+func (node *Node) handleBlockchainResponse(msg *Message) {
 	info, ok := msg.Payload.(map[string]any)
 	if !ok {
 		fmt.Println("Invalid blockchain response format")
@@ -408,7 +417,7 @@ func (n *Node) handleBlockchainResponse(msg *Message) {
 	}
 
 	peerHeight := int(info["latest_block_height"].(float64))
-	localHeight := len(n.Blockchain.GetBlocks()) - 1
+	localHeight := len(node.Blockchain.GetBlocks()) - 1
 
 	fmt.Printf("📡 Peer %s has blockchain height: %d (local: %d)\n",
 		msg.From, peerHeight, localHeight)
@@ -417,7 +426,7 @@ func (n *Node) handleBlockchainResponse(msg *Message) {
 		fmt.Printf("🔄 Local chain behind by %d blocks, requesting sync from %s\n",
 			peerHeight-localHeight, msg.From)
 		// Request missing blocks
-		n.requestMissingBlocks(msg.From, localHeight+1, peerHeight)
+		node.requestMissingBlocks(msg.From, localHeight+1, peerHeight)
 	} else if peerHeight < localHeight {
 		fmt.Printf("📤 Local chain ahead, peer %s is behind\n", msg.From)
 	} else {
@@ -425,7 +434,7 @@ func (n *Node) handleBlockchainResponse(msg *Message) {
 	}
 }
 
-func (n *Node) requestMissingBlocks(peerAddr string, startIndex, endIndex int) {
+func (node *Node) requestMissingBlocks(peerAddr string, startIndex, endIndex int) {
 	fmt.Printf("📥 Requesting blocks %d to %d from %s\n", startIndex, endIndex, peerAddr)
 	batchSize := 10
 	for i := startIndex; i <= endIndex; i += batchSize {
@@ -442,25 +451,25 @@ func (n *Node) requestMissingBlocks(peerAddr string, startIndex, endIndex int) {
 		msg := &Message{
 			Type:      MsgBlockReq,
 			Payload:   blockIndices,
-			From:      n.Address,
+			From:      node.Address,
 			Timestamp: time.Now().Unix(),
 		}
 
-		n.SendMessage(peerAddr, msg)
+		node.SendMessage(peerAddr, msg)
 
 		// Small delay between batches
 		time.Sleep(100 * time.Millisecond)
 	}
 }
 
-func (n *Node) respondToBlockRequest(msg *Message) {
+func (node *Node) respondToBlockRequest(msg *Message) {
 	indices, ok := msg.Payload.([]any)
 	if !ok {
 		fmt.Println("Invalid block request format")
 		return
 	}
 
-	blocks := n.Blockchain.GetBlocks()
+	blocks := node.Blockchain.GetBlocks()
 	responseBlocks := make([]*blockchain.Block, 0)
 
 	for _, idx := range indices {
@@ -476,23 +485,23 @@ func (n *Node) respondToBlockRequest(msg *Message) {
 		responseMsg := &Message{
 			Type:      MsgBlockRsp,
 			Payload:   responseBlocks,
-			From:      n.Address,
+			From:      node.Address,
 			Timestamp: time.Now().Unix(),
 		}
 
-		n.SendMessage(msg.From, responseMsg)
+		node.SendMessage(msg.From, responseMsg)
 		fmt.Printf("📤 Sent %d blocks to %s\n", len(responseBlocks), msg.From)
 	}
 }
 
-func (n *Node) handleBlockResponse(msg *Message) {
+func (node *Node) handleBlockResponse(msg *Message) {
 	blocks, ok := msg.Payload.([]any)
 	if !ok {
 		fmt.Println("Invalid block response format")
 		return
 	}
 
-	localBlocks := n.Blockchain.GetBlocks()
+	localBlocks := node.Blockchain.GetBlocks()
 	localHeight := len(localBlocks) - 1
 
 	addedBlocks := 0
@@ -502,17 +511,17 @@ func (n *Node) handleBlockResponse(msg *Message) {
 			continue
 		}
 
-		block := n.reconstructBlockFromMap(blockMap)
+		block := node.reconstructBlockFromMap(blockMap)
 		if block == nil {
 			continue
 		}
 
 		if block.Index == localHeight+1 && hex.EncodeToString(block.PrevHash) == hex.EncodeToString(localBlocks[localHeight].Hash) {
-			if n.Blockchain.VerifyBlock(block) {
-				n.Blockchain.AddBlock(block)
+			if node.Blockchain.VerifyBlock(block) {
+				node.Blockchain.AddBlock(block)
 				localHeight++
 				addedBlocks++
-				n.Mempool.Clear()
+				node.Mempool.Clear()
 				fmt.Printf("✅ Added synced block %d from %s\n", block.Index, msg.From)
 			}
 		}
@@ -523,7 +532,7 @@ func (n *Node) handleBlockResponse(msg *Message) {
 	}
 }
 
-func (n *Node) reconstructBlockFromMap(blockMap map[string]any) *blockchain.Block {
+func (node *Node) reconstructBlockFromMap(blockMap map[string]any) *blockchain.Block {
 	index := int(blockMap["index"].(float64))
 	prevHashStr := blockMap["prev_hash"].(string)
 	hashStr := blockMap["hash"].(string)
@@ -572,7 +581,7 @@ func getStringFromMap(m map[string]any, key string) string {
 	return ""
 }
 
-func (n *Node) handlePeersMessage(msg *Message) {
+func (node *Node) handlePeersMessage(msg *Message) {
 	peersData, ok := msg.Payload.([]any)
 	if !ok {
 		fmt.Println("Invalid peers payload")
@@ -580,30 +589,30 @@ func (n *Node) handlePeersMessage(msg *Message) {
 	}
 
 	for _, peerAddr := range peersData {
-		if addr, ok := peerAddr.(string); ok && addr != n.Address {
-			n.AddPeer(addr)
+		if addr, ok := peerAddr.(string); ok && addr != node.Address {
+			node.AddPeer(addr)
 		}
 	}
 }
 
-func (n *Node) BroadcastTransaction(tx *blockchain.Transaction) {
+func (node *Node) BroadcastTransaction(tx *blockchain.Transaction) {
 	msg := &Message{
 		Type:      MsgTransaction,
 		Payload:   tx,
-		From:      n.Address,
+		From:      node.Address,
 		Timestamp: time.Now().Unix(),
 	}
 
-	n.BroadcastMessage(msg)
+	node.BroadcastMessage(msg)
 }
 
-func (n *Node) BroadcastBlock(block *blockchain.Block) {
+func (node *Node) BroadcastBlock(block *blockchain.Block) {
 	msg := &Message{
 		Type:      MsgBlock,
 		Payload:   block,
-		From:      n.Address,
+		From:      node.Address,
 		Timestamp: time.Now().Unix(),
 	}
 
-	n.BroadcastMessage(msg)
+	node.BroadcastMessage(msg)
 }

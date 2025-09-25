@@ -14,7 +14,7 @@ type Storage struct {
 	DataDir string
 }
 
-func NewStorage(dataDir string) (*Storage, error) {
+func New(dataDir string) (*Storage, error) {
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		return nil, err
 	}
@@ -73,8 +73,8 @@ func (s *Storage) SaveMempool(mp *blockchain.Mempool) error {
 	return os.WriteFile(filePath, data, 0644)
 }
 
-// LoadMempool -> Load mempool transactions from JSON file
-func (s *Storage) LoadMempool() ([]blockchain.Transaction, error) {
+// LoadMempoolTransactions -> Load mempool transactions from JSON file
+func (s *Storage) LoadMempoolTransactions() ([]blockchain.Transaction, error) {
 	filePath := filepath.Join(s.DataDir, "mempool.json")
 
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {

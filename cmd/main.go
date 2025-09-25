@@ -24,8 +24,7 @@ func main() {
 
 	genesisAddress := *genesisAddr
 
-	// Initialize storage
-	store, err := storage.NewStorage(*dataDir)
+	store, err := storage.New(*dataDir)
 	if err != nil {
 		log.Printf("ERROR creating new storage: %v\n", err)
 		return
@@ -42,10 +41,10 @@ func main() {
 		log.Printf("Loaded existing blockchain with %d blocks", len(savedBc.Blocks))
 		newBc = savedBc
 
-		// Load mempool
 		newMempool = blockchain.NewMempool()
-		if transactions, err := store.LoadMempool(); err != nil {
-			log.Printf("Error loading mempool: %v", err)
+		if transactions, err := store.LoadMempoolTransactions(); err != nil {
+			log.Printf("Error loading mempool: %v\n", err)
+			return
 		} else {
 			log.Printf("Loaded %d transactions into mempool", len(transactions))
 			for _, tx := range transactions {
