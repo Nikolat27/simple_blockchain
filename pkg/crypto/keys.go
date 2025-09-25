@@ -21,7 +21,6 @@ func GenerateKeyPair() (*KeyPair, error) {
 		return nil, fmt.Errorf("failed to generate key pair: %w", err)
 	}
 
-	// Derive address from public key (similar to Bitcoin's approach)
 	hash := sha256.Sum256(pubKey)
 	address := hex.EncodeToString(hash[:20])
 
@@ -88,5 +87,5 @@ func VerifySignature(pubKeyHex string, message []byte, signature []byte) bool {
 		return false
 	}
 
-	return ed25519.Verify(ed25519.PublicKey(pubKey), message, signature)
+	return ed25519.Verify(pubKey, message, signature)
 }

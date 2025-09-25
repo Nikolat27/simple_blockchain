@@ -62,19 +62,8 @@ func main() {
 
 	// Connect to bootstrap peers
 	if *peers != "" {
-		peerList := strings.Split(*peers, ",")
-		for _, peerAddr := range peerList {
-			peerAddr = strings.TrimSpace(peerAddr)
-			if peerAddr == "" || peerAddr == nodeAddr {
-				continue
-			}
-
-			p2pNode.AddPeer(peerAddr)
-			if err := p2pNode.ConnectToPeer(peerAddr); err != nil {
-				log.Printf("Failed to connect to peer %s: %v", peerAddr, err)
-			}
-
-		}
+		peersList := strings.Split(*peers, ",")
+		p2pNode.ConnectToBootstrapNodes(peersList, nodeAddr)
 	}
 
 	// Start blockchain synchronization

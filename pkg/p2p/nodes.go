@@ -7,9 +7,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"simple_blockchain/pkg/blockchain"
 	"simple_blockchain/pkg/storage"
+	"strings"
 	"sync"
 	"time"
 )
@@ -44,6 +46,21 @@ func NewNode(address string, blockchain *blockchain.Blockchain, mempool *blockch
 		Mempool:    mempool,
 		Storage:    storage,
 		MessageCh:  make(chan *Message, 100),
+	}
+}
+
+func (node *Node) ConnectToBootstrapNodes(peersList []string, nodeAddr string) {
+	for _, peerAddr := range peersList {
+		peerAddr = strings.TrimSpace(peerAddr)
+		if peerAddr == "" || peerAddr == nodeAddr {
+			continue
+		}
+
+		node.AddPeer(peerAddr)
+		if err := node.ConnectToPeer(peerAddr); err != nil {
+			log.Printf("Failed to connect to peer %s: %v\n", peerAddr, err)
+		}
+
 	}
 }
 
