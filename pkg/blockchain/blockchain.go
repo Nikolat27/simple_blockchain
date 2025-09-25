@@ -278,41 +278,6 @@ func (bc *Blockchain) GetBalance(address string) uint64 {
 	return balance
 }
 
-// calculateCumulativeDifficulty calculates the total difficulty of a chain
-func (bc *Blockchain) calculateCumulativeDifficulty(chain []Block) uint64 {
-	difficulty := uint64(0)
-	for _, block := range chain {
-		// Each block contributes its difficulty (inverse of hash target)
-		// For simplicity, we'll use the number of leading zeros as difficulty
-		hashStr := hex.EncodeToString(block.Hash)
-		for _, char := range hashStr {
-			if char != '0' {
-				break
-			}
-			difficulty++
-		}
-	}
-	return difficulty
-}
-
-// findBestChain finds the chain with the most cumulative difficulty
-func (bc *Blockchain) findBestChain() []Block {
-	// For now, just return the main chain
-	// In a full implementation, this would compare all possible chains
-	return bc.Blocks
-}
-
-// reorganizeToChain switches the main chain to a longer chain
-func (bc *Blockchain) reorganizeToChain(newChain []Block) {
-	// This is a simplified version - in a full implementation,
-	// we would need to handle transaction reversion and validation
-	if len(newChain) > len(bc.Blocks) {
-		bc.Blocks = make([]Block, len(newChain))
-		copy(bc.Blocks, newChain)
-		fmt.Printf("🔄 Reorganized to longer chain with %d blocks\n", len(newChain))
-	}
-}
-
 // AddOrphanBlock adds a block to the orphan pool
 // Note: This function assumes the caller already holds bc.mu
 func (bc *Blockchain) AddOrphanBlock(block *Block) {
