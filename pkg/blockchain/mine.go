@@ -1,41 +1,50 @@
 package blockchain
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"time"
 )
 
-func (bc *Blockchain) StartMining(mempool *Mempool, minerAddress string) {
-	go bc.MineBlock(mempool, minerAddress)
-}
-
-func (bc *Blockchain) MineBlock(mempool *Mempool, minerAddress string) *Block {
+func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddress string) *Block {
+	// Continuously mines new blocks until the operation is cancelled
 	for {
-		transactions := mempool.GetTransactions()
+		select {
+		case <-ctx.Done():
+			fmt.Println("Mining cancelled")
+			return nil
+		default:
+			transactions := mempool.GetTransactions()
 
-		coinBaseTx := Transaction{
-			To:         minerAddress,
-			Amount:     MiningReward,
-			Status:     "confirmed",
-			IsCoinbase: true,
-		}
+			coinBaseTx := Transaction{
+				To:         minerAddress,
+				Amount:     MiningReward,
+				Status:     "confirmed",
+				IsCoinbase: true,
+			}
 
-		allTransactions := append([]Transaction{coinBaseTx}, transactions...)
+			allTransactions := append([]Transaction{coinBaseTx}, transactions...)
 
-		bc.mu.RLock()
-		prevHash := getPreviousBlockHash(bc.Blocks)
-		blockIndex := len(bc.Blocks)
-		bc.mu.RUnlock()
+			bc.mu.RLock()
+			prevHash := getPreviousBlockHash(bc.Blocks)
+			blockIndex := len(bc.Blocks)
+			bc.mu.RUnlock()
 
-		newBlock := &Block{
-			Index:        blockIndex,
-			PrevHash:     prevHash,
-			Timestamp:    time.Now(),
-			Transactions: allTransactions,
-			Nonce:        0,
-		}
+			newBlock := &Block{
+				Index:        blockIndex,
+				PrevHash:     prevHash,
+				Timestamp:    time.Now(),
+				Transactions: allTransactions,
+				Nonce:        0,
+			}
 
-		if proofOfWork(newBlock) {
+			// keep looping until POW is true
+			if !proofOfWork(ctx, newBlock) {
+				return nil // cancelled
+			}
+
+			// block found
 			bc.AddBlock(newBlock)
 
 			if err := bc.LevelDB.IncreaseUserBalance([]byte(minerAddress), MiningReward); err != nil {
@@ -43,22 +52,24 @@ func (bc *Blockchain) MineBlock(mempool *Mempool, minerAddress string) *Block {
 			}
 
 			mempool.Clear()
-
-			// restart mining again on the new block
-			bc.StartMining(mempool, minerAddress)
-
-			return newBlock
 		}
 	}
 }
 
-func proofOfWork(block *Block) bool {
+func proofOfWork(ctx context.Context, block *Block) bool {
 	for {
-		block.HashBlock()
-		if block.IsValidHash() {
-			return true
+		select {
+		case <-ctx.Done():
+			fmt.Println("POW operating cancelled")
+			return false
+		default:
+			block.HashBlock()
+			if block.IsValidHash() {
+				return true
+			}
+
+			block.Nonce++
 		}
-		block.Nonce++
 	}
 }
 
