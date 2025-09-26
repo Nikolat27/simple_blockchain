@@ -1,10 +1,8 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
-	"time"
 )
 
 func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
@@ -18,11 +16,7 @@ func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create a context with timeout for mining operation
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	minedBlock := handler.Blockchain.MineBlock(ctx, handler.Mempool, input.MinerAddress)
+	minedBlock := handler.Blockchain.MineBlock(handler.Mempool, input.MinerAddress)
 
 	if minedBlock == nil {
 		w.WriteHeader(http.StatusBadRequest)

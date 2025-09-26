@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-const Difficulty = 4
-
 type Block struct {
 	Index        int           `json:"index"`
 	PrevHash     []byte        `json:"prev_hash"`
@@ -33,4 +31,17 @@ func (block *Block) HashBlock() {
 func (block *Block) IsValidHash() bool {
 	hashStr := hex.EncodeToString(block.Hash)
 	return strings.HasPrefix(hashStr, strings.Repeat("0", Difficulty))
+}
+
+func createGenesisBlock(genesisTx *Transaction) *Block {
+	block := &Block{
+		Index:        0,
+		PrevHash:     make([]byte, 32),
+		Timestamp:    time.Now(),
+		Transactions: []Transaction{*genesisTx},
+		Nonce:        0,
+	}
+
+	block.HashBlock()
+	return block
 }

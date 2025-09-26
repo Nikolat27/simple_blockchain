@@ -12,7 +12,7 @@ type HttpServer struct {
 	Server *http.Server
 }
 
-func NewHttpServer(port string, handler *handler.Handler) *HttpServer {
+func New(port string, handler *handler.Handler) *HttpServer {
 	router := newRouter(handler)
 
 	var srv = &http.Server{

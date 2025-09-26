@@ -55,3 +55,12 @@ func (tx *Transaction) Verify() bool {
 	hash := tx.hash()
 	return crypto.VerifySignature(tx.PublicKey, hash, tx.Signature)
 }
+
+func (bc *Blockchain) ValidateTransaction(tx *Transaction) bool {
+	if tx.IsCoinbase {
+		return true
+	}
+
+	balance := bc.GetBalance(tx.From)
+	return balance >= tx.Amount
+}

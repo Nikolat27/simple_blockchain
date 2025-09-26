@@ -74,10 +74,6 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 
 	handler.Mempool.AddTransaction(&newTx)
 
-	if handler.P2PNode != nil {
-		handler.P2PNode.BroadcastTransaction(&newTx)
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Transaction added to mempool",
