@@ -82,24 +82,3 @@ func getPreviousBlockHash(blocks []Block) []byte {
 
 	return prevHash
 }
-
-func (bc *Blockchain) updateUserBalances(txs []Transaction) error {
-	for _, tx := range txs {
-		if tx.IsCoinbase {
-			if err := bc.LevelDB.IncreaseUserBalance([]byte(tx.To), int(tx.Amount)); err != nil {
-				return fmt.Errorf("failed to credit miner %s: %w", tx.To, err)
-			}
-			continue
-		}
-
-		if err := bc.LevelDB.DecreaseUserBalance([]byte(tx.From), int(tx.Amount)); err != nil {
-			return fmt.Errorf("failed to debit sender %s: %w", tx.From, err)
-		}
-
-		if err := bc.LevelDB.IncreaseUserBalance([]byte(tx.To), int(tx.Amount)); err != nil {
-			return fmt.Errorf("failed to credit receiver %s: %w", tx.To, err)
-		}
-	}
-
-	return nil
-}

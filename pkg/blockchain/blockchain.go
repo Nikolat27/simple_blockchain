@@ -4,24 +4,26 @@ import (
 	"bytes"
 	"fmt"
 	"simple_blockchain/pkg/LevelDB"
-	"strconv"
+	"simple_blockchain/pkg/database"
 	"sync"
 )
 
 const MiningReward = 5
-const Difficulty = 4
+const Difficulty = 5
 
 type Blockchain struct {
 	Blocks []Block `json:"blocks"`
 	mu     sync.RWMutex
 
-	LevelDB *LevelDB.LevelDB
+	Database *database.Database
+	LevelDB  *LevelDB.LevelDB
 }
 
-func NewBlockchain(genesisAddress string, levelDB *LevelDB.LevelDB) *Blockchain {
+func NewBlockchain(genesisAddress string, levelDB *LevelDB.LevelDB, sqlite *database.Database) *Blockchain {
 	bc := &Blockchain{
-		Blocks:  make([]Block, 0),
-		LevelDB: levelDB,
+		Blocks:   make([]Block, 0),
+		LevelDB:  levelDB,
+		Database: sqlite,
 	}
 
 	genesisTx := &Transaction{
@@ -35,8 +37,7 @@ func NewBlockchain(genesisAddress string, levelDB *LevelDB.LevelDB) *Blockchain 
 
 	bc.Blocks = append(bc.Blocks, *genesisBlock)
 
-	// Apply genesis transaction balance
-	if err := bc.LevelDB.IncreaseUserBalance([]byte(genesisAddress), int(genesisTx.Amount)); err != nil {
+	if err := bc.Database.IncreaseUserBalance(genesisAddress, genesisTx.Amount); err != nil {
 		panic(fmt.Sprintf("failed to apply genesis balance: %v", err))
 	}
 
@@ -78,11 +79,35 @@ func (bc *Blockchain) VerifyBlock(block *Block) bool {
 }
 
 func (bc *Blockchain) GetBalance(address string) (uint64, error) {
-	value, err := bc.LevelDB.Get([]byte(address), []byte("0"))
+	return bc.Database.GetBalance(address)
+}
+
+func (bc *Blockchain) updateUserBalances(txs []Transaction) error {
+	sqlTx, err := bc.Database.DB.Begin()
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	// convert []byte to uint64
-	return strconv.ParseUint(string(value), 10, 64)
+	defer sqlTx.Rollback()
+
+	for _, tx := range txs {
+
+		if tx.IsCoinbase {
+			if err := bc.Database.IncreaseUserBalance(tx.To, tx.Amount); err != nil {
+				return fmt.Errorf("failed to credit miner %s: %w", tx.To, err)
+			}
+
+			continue
+		}
+
+		if err := bc.Database.DecreaseUserBalance(tx.From, tx.Amount); err != nil {
+			return fmt.Errorf("failed to debit sender %s: %w", tx.From, err)
+		}
+
+		if err := bc.Database.IncreaseUserBalance(tx.To, tx.Amount); err != nil {
+			return fmt.Errorf("failed to credit receiver %s: %w", tx.From, err)
+		}
+	}
+
+	return sqlTx.Commit()
 }
