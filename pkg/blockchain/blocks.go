@@ -33,12 +33,12 @@ func (block *Block) IsValidHash() bool {
 	return strings.HasPrefix(hashStr, strings.Repeat("0", Difficulty))
 }
 
-func createGenesisBlock(genesisTx *Transaction) *Block {
+func createGenesisBlock() *Block {
 	block := &Block{
 		Index:        0,
 		PrevHash:     make([]byte, 32),
 		Timestamp:    time.Now(),
-		Transactions: []Transaction{*genesisTx},
+		Transactions: []Transaction{},
 		Nonce:        0,
 	}
 

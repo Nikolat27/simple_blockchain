@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"simple_blockchain/pkg/HttpServer"
-	"simple_blockchain/pkg/LevelDB"
 	"simple_blockchain/pkg/blockchain"
 	"simple_blockchain/pkg/database"
 	"simple_blockchain/pkg/handler"
@@ -12,22 +11,16 @@ import (
 const Port = "8000"
 
 func main() {
-	sqliteDBInstance, err := database.New("sqlite3", "./blockchain_db.sqlite2")
+	dbInstance, err := database.New("sqlite3", "./blockchain_db.sqlite2")
 	if err != nil {
 		panic(err)
 	}
-	defer sqliteDBInstance.Close()
-
-	levelDBInstance, err := LevelDB.New("balances")
-	if err != nil {
-		panic(err)
-	}
-	defer levelDBInstance.Close()
+	defer dbInstance.Close()
 
 	var newBc *blockchain.Blockchain
 	var newMempool *blockchain.Mempool
 
-	newBc = blockchain.NewBlockchain("genesis-address", levelDBInstance, sqliteDBInstance)
+	newBc = blockchain.NewBlockchain(dbInstance)
 	newMempool = blockchain.NewMempool()
 
 	newHandler := handler.New(newBc, newMempool)

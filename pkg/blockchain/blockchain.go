@@ -3,7 +3,6 @@ package blockchain
 import (
 	"bytes"
 	"fmt"
-	"simple_blockchain/pkg/LevelDB"
 	"simple_blockchain/pkg/database"
 	"sync"
 )
@@ -16,30 +15,17 @@ type Blockchain struct {
 	mu     sync.RWMutex
 
 	Database *database.Database
-	LevelDB  *LevelDB.LevelDB
 }
 
-func NewBlockchain(genesisAddress string, levelDB *LevelDB.LevelDB, sqlite *database.Database) *Blockchain {
+func NewBlockchain(db *database.Database) *Blockchain {
 	bc := &Blockchain{
 		Blocks:   make([]Block, 0),
-		LevelDB:  levelDB,
-		Database: sqlite,
+		Database: db,
 	}
 
-	genesisTx := &Transaction{
-		To:         genesisAddress,
-		Amount:     1000,
-		Status:     "confirmed",
-		IsCoinbase: true,
-	}
-
-	genesisBlock := createGenesisBlock(genesisTx)
+	genesisBlock := createGenesisBlock()
 
 	bc.Blocks = append(bc.Blocks, *genesisBlock)
-
-	if err := bc.Database.IncreaseUserBalance(genesisAddress, genesisTx.Amount); err != nil {
-		panic(fmt.Sprintf("failed to apply genesis balance: %v", err))
-	}
 
 	return bc
 }
