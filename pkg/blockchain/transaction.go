@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"simple_blockchain/pkg/crypto"
+	"time"
 )
 
 type Transaction struct {
@@ -23,6 +24,8 @@ func (tx *Transaction) hash() []byte {
 
 	txCopy.Signature = nil
 	// Keep PublicKey for hashing as it's part of the transaction data
+
+	tx.Timestamp = time.Now().Unix()
 
 	data, _ := json.Marshal(txCopy)
 	hash := sha256.Sum256(data)
