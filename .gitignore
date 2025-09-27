@@ -1,3 +1,4 @@
-data
-balances
 .idea
+
+# SQLite database
+*.sqlite

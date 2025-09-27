@@ -7,6 +7,8 @@ build:
 view-leveldb:
 	@leveldb-viewer -db balances
 
-clear:
-	rm -rf data
-	rm -rf balances
+makemigrations:
+	goose -dir ./migrations sqlite3 ./blockchain_db.sqlite up
+
+rollback:
+	goose -dir ./migrations sqlite3 ./blockchain_db.sqlite up
