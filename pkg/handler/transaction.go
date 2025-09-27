@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 	"simple_blockchain/pkg/blockchain"
 	"simple_blockchain/pkg/crypto"
+	"simple_blockchain/pkg/utils"
 	"time"
 )
 
@@ -17,15 +17,13 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		PublicKey  string `json:"public_key"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
+	if err := utils.ParseJSON(r, 1_000, &input); err != nil {
+		utils.WriteJSON(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if input.Amount == 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Your transaction amount must be more than 0"))
+		utils.WriteJSON(w, http.StatusBadRequest, "Your transaction amount must be more than 0")
 		return
 	}
 
@@ -41,52 +39,48 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 	// Validate that the from address matches the public key
 	derivedAddress, err := crypto.DeriveAddressFromPublicKey(input.PublicKey)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Invalid public key format"))
+		utils.WriteJSON(w, http.StatusBadRequest, "Invalid public key format")
 		return
 	}
 
 	if derivedAddress != input.From {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("From address does not match the provided public key"))
+		utils.WriteJSON(w, http.StatusBadRequest, "From address does not match the provided public key")
 		return
 	}
 
 	// Sign the transaction with the provided keys
-	err = newTx.SignWithHexKeys(input.PrivateKey, input.PublicKey)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Failed to sign transaction: " + err.Error()))
+	if err := newTx.SignWithHexKeys(input.PrivateKey, input.PublicKey); err != nil {
+		utils.WriteJSON(w, http.StatusBadRequest, "Failed to sign transaction: "+err.Error())
 		return
 	}
 
 	if !newTx.Verify() {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Invalid signature"))
+		utils.WriteJSON(w, http.StatusBadRequest, "Invalid signature")
 		return
 	}
 
 	if !handler.Blockchain.ValidateTransaction(&newTx) {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Insufficient balance"))
+		utils.WriteJSON(w, http.StatusBadRequest, "Insufficient balance")
 		return
 	}
 
 	handler.Mempool.AddTransaction(&newTx)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	resp := map[string]string{
 		"message": "Transaction added to mempool",
 		"status":  "pending",
-	})
+	}
+
+	utils.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (handler *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 	transactions := handler.Mempool.GetTransactions()
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	resp := map[string]any{
 		"transactions": transactions,
 		"count":        len(transactions),
-	})
+	}
+
+	utils.WriteJSON(w, http.StatusOK, resp)
 }
