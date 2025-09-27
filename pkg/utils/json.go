@@ -23,6 +23,11 @@ func WriteJSON(w http.ResponseWriter, statusCode int, message any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 
+	switch value := message.(type) {
+	case error:
+		message = value.Error()
+	}
+
 	if err := json.NewEncoder(w).Encode(message); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
