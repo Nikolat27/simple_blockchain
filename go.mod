@@ -10,3 +10,5 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/mattn/go-sqlite3 v1.14.32
 )
+
+require github.com/joho/godotenv v1.5.1
