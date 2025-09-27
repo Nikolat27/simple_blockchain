@@ -34,6 +34,7 @@ func main() {
 	newBc = blockchain.NewBlockchain(dbInstance)
 	newMempool = blockchain.NewMempool()
 
+	// http handlers
 	newHandler := handler.New(newBc, newMempool)
 
 	httpServer := HttpServer.New(Port, newHandler)
@@ -53,5 +54,9 @@ func loadEnv() error {
 		defer file.Close()
 	}
 
-	return godotenv.Load()
+	if err := godotenv.Load(); err != nil {
+		return fmt.Errorf("failed to load the .env variables")
+	}
+
+	return nil
 }
