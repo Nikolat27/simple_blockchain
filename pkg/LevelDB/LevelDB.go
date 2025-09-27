@@ -26,6 +26,23 @@ func New(fileAddress string) (*LevelDB, error) {
 	}, nil
 }
 
+func (ld *LevelDB) Get(key, defaultValue []byte) ([]byte, error) {
+	value, err := ld.db.Get(key, nil)
+	if err != nil {
+		if errors.Is(err, leveldb.ErrNotFound) {
+			return defaultValue, nil
+		}
+
+		return nil, err
+	}
+
+	return value, nil
+}
+
+func (ld *LevelDB) Set(key, value []byte) error {
+	return ld.db.Put(key, value, nil)
+}
+
 func (ld *LevelDB) IncreaseUserBalance(address []byte, amount int) error {
 	// Get current balance
 	value, err := ld.db.Get(address, nil)
@@ -49,7 +66,7 @@ func (ld *LevelDB) IncreaseUserBalance(address []byte, amount int) error {
 	return ld.db.Put(address, []byte(strconv.Itoa(newBalance)), nil)
 }
 
-func (ld *LevelDB) DecreaseUserBalance(address, amount []byte) error {
+func (ld *LevelDB) DecreaseUserBalance(address []byte, amount int) error {
 	// Get current balance
 	value, err := ld.db.Get(address, nil)
 	if err != nil {
@@ -62,13 +79,7 @@ func (ld *LevelDB) DecreaseUserBalance(address, amount []byte) error {
 		return err
 	}
 
-	// Convert amount to int
-	amountInt, err := strconv.Atoi(string(amount))
-	if err != nil {
-		return err
-	}
-
-	newBalance := currentBalanceInt - amountInt
+	newBalance := currentBalanceInt - amount
 
 	return ld.db.Put(address, []byte(strconv.Itoa(newBalance)), nil)
 }
