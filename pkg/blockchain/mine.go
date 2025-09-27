@@ -39,7 +39,6 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 				Nonce:        0,
 			}
 
-			// keep looping until POW is true
 			if !proofOfWork(ctx, newBlock) {
 				return nil // cancelled
 			}
@@ -47,8 +46,8 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 			// block found
 			bc.AddBlock(newBlock)
 
-			if err := bc.LevelDB.IncreaseUserBalance([]byte(minerAddress), MiningReward); err != nil {
-				log.Fatalf("ERROR increasing user balance: %v\n", err)
+			if err := bc.updateUserBalances(newBlock.Transactions); err != nil {
+				log.Printf("failed to update the user balances: %v\n", err)
 			}
 
 			mempool.Clear()
@@ -60,7 +59,7 @@ func proofOfWork(ctx context.Context, block *Block) bool {
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("POW operating cancelled")
+			fmt.Println("POW operation cancelled")
 			return false
 		default:
 			block.HashBlock()
@@ -82,4 +81,25 @@ func getPreviousBlockHash(blocks []Block) []byte {
 	}
 
 	return prevHash
+}
+
+func (bc *Blockchain) updateUserBalances(txs []Transaction) error {
+	for _, tx := range txs {
+		if tx.IsCoinbase {
+			if err := bc.LevelDB.IncreaseUserBalance([]byte(tx.To), int(tx.Amount)); err != nil {
+				return fmt.Errorf("failed to credit miner %s: %w", tx.To, err)
+			}
+			continue
+		}
+
+		if err := bc.LevelDB.DecreaseUserBalance([]byte(tx.From), int(tx.Amount)); err != nil {
+			return fmt.Errorf("failed to debit sender %s: %w", tx.From, err)
+		}
+
+		if err := bc.LevelDB.IncreaseUserBalance([]byte(tx.To), int(tx.Amount)); err != nil {
+			return fmt.Errorf("failed to credit receiver %s: %w", tx.To, err)
+		}
+	}
+
+	return nil
 }
