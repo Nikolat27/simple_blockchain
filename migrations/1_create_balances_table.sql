@@ -1,0 +1,10 @@
+-- +goose Up
+CREATE TABLE IF NOT EXISTS balances
+(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    address TEXT NOT NULL UNIQUE ,
+    balance INTEGER NOT NULL DEFAULT(0)
+);
+
+-- +goose Down
+DROP TABLE IF EXISTS balances;
