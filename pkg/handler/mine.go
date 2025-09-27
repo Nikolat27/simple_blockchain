@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
+	"simple_blockchain/pkg/utils"
 )
 
 func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
@@ -10,9 +10,8 @@ func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
 		MinerAddress string `json:"miner_address"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
+	if err := utils.ParseJSON(r, 1_000, &input); err != nil {
+		utils.WriteJSON(w, http.StatusBadRequest, err)
 		return
 	}
 
@@ -20,11 +19,9 @@ func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
 	minedBlock := handler.Blockchain.MineBlock(ctx, handler.Mempool, input.MinerAddress)
 
 	if minedBlock == nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("No transactions to mine"))
+		utils.WriteJSON(w, http.StatusBadRequest, "No transactions to mine")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(minedBlock)
+	utils.WriteJSON(w, http.StatusOK, minedBlock)
 }

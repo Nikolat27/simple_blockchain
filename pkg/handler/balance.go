@@ -1,23 +1,26 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
+	"simple_blockchain/pkg/utils"
 )
 
 func (handler *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	if address == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Address parameter required"))
+		utils.WriteJSON(w, http.StatusBadRequest, "Address parameter required")
 		return
 	}
 
-	balance := handler.Blockchain.GetBalance(address)
+	balance, err := handler.Blockchain.GetBalance(address)
+	if err != nil {
+		utils.WriteJSON(w, http.StatusInternalServerError, err)
+		return
+	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"address": address,
+	resp := map[string]any{
 		"balance": balance,
-	})
+	}
+
+	utils.WriteJSON(w, http.StatusOK, resp)
 }

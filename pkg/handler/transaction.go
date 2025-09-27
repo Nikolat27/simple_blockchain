@@ -17,7 +17,7 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		PublicKey  string `json:"public_key"`
 	}
 
-	if err := utils.ParseJSON(r, 1_000, &input); err != nil {
+	if err := utils.ParseJSON(r, 10_000, &input); err != nil {
 		utils.WriteJSON(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -44,7 +44,7 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if derivedAddress != input.From {
-		utils.WriteJSON(w, http.StatusBadRequest, "From address does not match the provided public key")
+		utils.WriteJSON(w, http.StatusBadRequest, "'From' address does not match the provided public key")
 		return
 	}
 
@@ -59,8 +59,8 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !handler.Blockchain.ValidateTransaction(&newTx) {
-		utils.WriteJSON(w, http.StatusBadRequest, "Insufficient balance")
+	if err := handler.Blockchain.ValidateTransaction(&newTx); err != nil {
+		utils.WriteJSON(w, http.StatusBadRequest, err)
 		return
 	}
 

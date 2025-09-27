@@ -1,16 +1,15 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 	"simple_blockchain/pkg/crypto"
+	"simple_blockchain/pkg/utils"
 )
 
 func (handler *Handler) GenerateKeys(w http.ResponseWriter, r *http.Request) {
 	keyPair, err := crypto.GenerateKeyPair()
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Failed to generate key pair: " + err.Error()))
+		utils.WriteJSON(w, http.StatusInternalServerError, "Failed to generate key pair: "+err.Error())
 		return
 	}
 
@@ -20,6 +19,5 @@ func (handler *Handler) GenerateKeys(w http.ResponseWriter, r *http.Request) {
 		"address":     keyPair.Address,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	utils.WriteJSON(w, http.StatusOK, resp)
 }
