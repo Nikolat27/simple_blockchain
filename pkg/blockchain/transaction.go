@@ -3,6 +3,7 @@ package blockchain
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"simple_blockchain/pkg/crypto"
 )
 
@@ -29,9 +30,9 @@ func (tx *Transaction) hash() []byte {
 }
 
 func (tx *Transaction) Sign(keyPair *crypto.KeyPair) error {
+	tx.PublicKey = keyPair.GetPublicKeyHex() // Set PublicKey BEFORE hashing
 	hash := tx.hash()
 	tx.Signature = keyPair.Sign(hash)
-	tx.PublicKey = keyPair.GetPublicKeyHex()
 	return nil
 }
 
@@ -41,9 +42,9 @@ func (tx *Transaction) SignWithHexKeys(privateKeyHex, publicKeyHex string) error
 		return err
 	}
 
+	tx.PublicKey = keyPair.GetPublicKeyHex() // Set PublicKey BEFORE hashing
 	hash := tx.hash()
 	tx.Signature = keyPair.Sign(hash)
-	tx.PublicKey = keyPair.GetPublicKeyHex()
 	return nil
 }
 
@@ -56,11 +57,19 @@ func (tx *Transaction) Verify() bool {
 	return crypto.VerifySignature(tx.PublicKey, hash, tx.Signature)
 }
 
-func (bc *Blockchain) ValidateTransaction(tx *Transaction) bool {
+func (bc *Blockchain) ValidateTransaction(tx *Transaction) error {
 	if tx.IsCoinbase {
-		return true
+		return nil
 	}
 
-	balance := bc.GetBalance(tx.From)
-	return balance >= tx.Amount
+	balance, err := bc.GetBalance(tx.From)
+	if err != nil {
+		return err
+	}
+
+	if balance >= tx.Amount {
+		return nil
+	}
+
+	return errors.New("balance is insufficient")
 }

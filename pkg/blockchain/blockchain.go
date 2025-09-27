@@ -2,12 +2,14 @@ package blockchain
 
 import (
 	"bytes"
+	"fmt"
 	"simple_blockchain/pkg/LevelDB"
+	"strconv"
 	"sync"
 )
 
 const MiningReward = 5
-const Difficulty = 100000
+const Difficulty = 4
 
 type Blockchain struct {
 	Blocks []Block `json:"blocks"`
@@ -32,6 +34,11 @@ func NewBlockchain(genesisAddress string, levelDB *LevelDB.LevelDB) *Blockchain 
 	genesisBlock := createGenesisBlock(genesisTx)
 
 	bc.Blocks = append(bc.Blocks, *genesisBlock)
+
+	// Apply genesis transaction balance
+	if err := bc.LevelDB.IncreaseUserBalance([]byte(genesisAddress), int(genesisTx.Amount)); err != nil {
+		panic(fmt.Sprintf("failed to apply genesis balance: %v", err))
+	}
 
 	return bc
 }
@@ -70,23 +77,12 @@ func (bc *Blockchain) VerifyBlock(block *Block) bool {
 	return hashMatches && tempBlock.IsValidHash()
 }
 
-func (bc *Blockchain) GetBalance(address string) uint64 {
-	bc.mu.RLock()
-	defer bc.mu.RUnlock()
-
-	balance := uint64(0)
-
-	for _, block := range bc.Blocks {
-		for _, tx := range block.Transactions {
-			if tx.To == address {
-				balance += tx.Amount
-			}
-
-			if tx.From == address && !tx.IsCoinbase {
-				balance -= tx.Amount
-			}
-		}
+func (bc *Blockchain) GetBalance(address string) (uint64, error) {
+	value, err := bc.LevelDB.Get([]byte(address), []byte("0"))
+	if err != nil {
+		return 0, err
 	}
 
-	return balance
+	// convert []byte to uint64
+	return strconv.ParseUint(string(value), 10, 64)
 }
