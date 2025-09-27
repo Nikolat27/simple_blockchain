@@ -20,8 +20,8 @@ func ParseJSON(r *http.Request, maxBytes int64, input any) error {
 }
 
 func WriteJSON(w http.ResponseWriter, statusCode int, message any) {
-	w.WriteHeader(statusCode)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
 
 	if err := json.NewEncoder(w).Encode(message); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
