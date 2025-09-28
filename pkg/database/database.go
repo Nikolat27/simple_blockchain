@@ -8,7 +8,7 @@ import (
 )
 
 type Database struct {
-	DB *sql.DB
+	db *sql.DB
 }
 
 func New(driverName, dataSourceName string) (*Database, error) {
@@ -17,7 +17,7 @@ func New(driverName, dataSourceName string) (*Database, error) {
 	}
 
 	if dataSourceName == "" {
-		dataSourceName = "./blockchain_db.sqlite2"
+		dataSourceName = "./blockchain_db.sqlite"
 	}
 
 	db, err := sql.Open(driverName, dataSourceName)
@@ -26,20 +26,42 @@ func New(driverName, dataSourceName string) (*Database, error) {
 	}
 
 	return &Database{
-		DB: db,
+		db: db,
 	}, nil
 }
 
 func (sqlite *Database) Close() error {
-	return sqlite.DB.Close()
+	return sqlite.db.Close()
 }
 
 func (sqlite *Database) Version() (string, error) {
 	var version string
 
-	if err := sqlite.DB.QueryRow("SELECT sqlite_version()").Scan(&version); err != nil {
+	if err := sqlite.db.QueryRow("SELECT sqlite_version()").Scan(&version); err != nil {
 		return "", err
 	}
 
 	return version, nil
+}
+
+// Begin -> For isolation level
+func (sqlite *Database) Begin() (*sql.Tx, error) {
+	return sqlite.db.Begin()
+}
+
+// ClearAllData removes all blockchain data (used when corruption is detected)
+func (sqlite *Database) ClearAllData() error {
+	queries := []string{
+		"DELETE FROM transactions",
+		"DELETE FROM blocks",
+		"DELETE FROM balances",
+	}
+
+	for _, query := range queries {
+		if _, err := sqlite.db.Exec(query); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

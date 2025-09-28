@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-func (sqlite *Database) GetBalance(address string) (uint64, error) {
+func (sqlite *Database) GetConfirmedBalance(address string) (uint64, error) {
 	query := `
 		SELECT balance
 		FROM balances
@@ -14,7 +14,7 @@ func (sqlite *Database) GetBalance(address string) (uint64, error) {
 	`
 
 	var balance uint64
-	if err := sqlite.DB.QueryRow(query, address).Scan(&balance); err != nil {
+	if err := sqlite.db.QueryRow(query, address).Scan(&balance); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}
@@ -32,9 +32,7 @@ func (sqlite *Database) IncreaseUserBalance(address string, amount uint64) error
 		ON CONFLICT (address) DO UPDATE SET balance = balance + excluded.balance	
 	`
 
-	_, err := sqlite.DB.Exec(query, address, amount)
-
-	if err != nil {
+	if _, err := sqlite.db.Exec(query, address, amount); err != nil {
 		return err
 	}
 
@@ -45,10 +43,14 @@ func (sqlite *Database) DecreaseUserBalance(address string, amount uint64) error
 	query := `
 		INSERT INTO balances(address, balance)
 		VALUES (?, ?)
-		ON CONFLICT (address) DO UPDATE SET balance = balance + excluded.balance
+		ON CONFLICT (address) DO UPDATE
+		   SET balance = CASE
+		   WHEN balance - excluded.balance >= 0 THEN balance - excluded.balance
+		ELSE balance -- keep it unchanged
+		END;
 	`
 
-	result, err := sqlite.DB.Exec(query, address, amount)
+	result, err := sqlite.db.Exec(query, address, amount)
 
 	if err != nil {
 		return err
