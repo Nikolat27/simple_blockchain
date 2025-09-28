@@ -1,10 +1,12 @@
 package blockchain
 
-import "sync"
+import (
+	"sync"
+)
 
 type Mempool struct {
 	transactions []Transaction
-	mu           sync.RWMutex // Protects concurrent access to transactions
+	Mutex        sync.RWMutex // Protects concurrent access to transactions
 }
 
 func NewMempool() *Mempool {
@@ -14,22 +16,26 @@ func NewMempool() *Mempool {
 }
 
 func (mp *Mempool) AddTransaction(tx *Transaction) {
-	mp.mu.Lock()
-	defer mp.mu.Unlock()
+	mp.Mutex.Lock()
+	defer mp.Mutex.Unlock()
+
 	mp.transactions = append(mp.transactions, *tx)
 }
 
 func (mp *Mempool) GetTransactions() []Transaction {
-	mp.mu.RLock()
-	defer mp.mu.RUnlock()
+	mp.Mutex.RLock()
+	defer mp.Mutex.RUnlock()
+
 	// Return a copy to prevent external modification
 	transactions := make([]Transaction, len(mp.transactions))
 	copy(transactions, mp.transactions)
+
 	return transactions
 }
 
 func (mp *Mempool) Clear() {
-	mp.mu.Lock()
-	defer mp.mu.Unlock()
+	mp.Mutex.Lock()
+	defer mp.Mutex.Unlock()
+
 	mp.transactions = []Transaction{}
 }

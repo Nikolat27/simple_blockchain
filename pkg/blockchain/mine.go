@@ -32,14 +32,19 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 			bc.mu.RUnlock()
 
 			newBlock := &Block{
-				Index:        blockIndex,
+				Id:           int64(blockIndex),
 				PrevHash:     prevHash,
-				Timestamp:    time.Now(),
+				Timestamp:    time.Now().Unix(),
 				Transactions: allTransactions,
 				Nonce:        0,
 			}
 
-			if !proofOfWork(ctx, newBlock) {
+			isBlockMined, err := proofOfWork(ctx, newBlock)
+			if err != nil {
+				log.Println(err)
+			}
+
+			if !isBlockMined {
 				return nil // cancelled
 			}
 
@@ -55,16 +60,20 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 	}
 }
 
-func proofOfWork(ctx context.Context, block *Block) bool {
+func proofOfWork(ctx context.Context, block *Block) (bool, error) {
 	for {
 		select {
 		case <-ctx.Done():
 			fmt.Println("POW operation cancelled")
-			return false
+			return false, nil
 		default:
-			block.HashBlock()
+			if err := block.HashBlock(); err != nil {
+				return false, err
+			}
+
 			if block.IsValidHash() {
-				return true
+				fmt.Println("Mined a block")
+				return true, nil
 			}
 
 			block.Nonce++
