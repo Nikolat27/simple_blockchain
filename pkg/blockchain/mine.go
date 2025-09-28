@@ -17,14 +17,9 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 		default:
 			transactions := mempool.GetTransactions()
 
-			coinBaseTx := Transaction{
-				To:         minerAddress,
-				Amount:     MiningReward,
-				Status:     "confirmed",
-				IsCoinbase: true,
-			}
+			coinBaseTx := createCoinbaseTx(minerAddress, MiningReward)
 
-			allTransactions := append([]Transaction{coinBaseTx}, transactions...)
+			allTransactions := append([]Transaction{*coinBaseTx}, transactions...)
 
 			bc.mu.RLock()
 			prevHash := getPreviousBlockHash(bc.Blocks)

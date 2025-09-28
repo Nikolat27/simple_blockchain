@@ -3,6 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"simple_blockchain/pkg/database"
@@ -162,7 +163,7 @@ func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
 			return nil, err
 		}
 
-		parseDBTransactions(&block, dbTransactions)
+		block.parseDBTransactions(dbTransactions)
 
 		blocks = append(blocks, block)
 	}
@@ -172,24 +173,6 @@ func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
 	}
 
 	return blocks, nil
-}
-
-// parseDBTransactions -> Convert DB transactions to blockchain transactions
-func parseDBTransactions(block *Block, dbTxs []database.DBTransactionSchema) {
-	block.Transactions = make([]Transaction, len(dbTxs))
-
-	for idx, dbTx := range dbTxs {
-		block.Transactions[idx] = Transaction{
-			From:       dbTx.From,
-			To:         dbTx.To,
-			Amount:     dbTx.Amount,
-			Timestamp:  dbTx.Timestamp,
-			PublicKey:  dbTx.PublicKey,
-			Signature:  dbTx.Signature,
-			Status:     dbTx.Status,
-			IsCoinbase: dbTx.IsCoinbase,
-		}
-	}
 }
 
 func (bc *Blockchain) VerifyBlock(block *Block) (bool, error) {
@@ -234,22 +217,6 @@ func (bc *Blockchain) GetBalance(address string) (uint64, error) {
 	return effectiveBalance, nil
 }
 
-func getUserPendingOutgoing(address string, mempoolTxs []Transaction) uint64 {
-	var pending uint64
-
-	for _, tx := range mempoolTxs {
-		if tx.IsCoinbase {
-			continue
-		}
-
-		if tx.From == address {
-			pending += tx.Amount
-		}
-	}
-
-	return pending
-}
-
 func (bc *Blockchain) updateUserBalances(txs []Transaction) error {
 	sqlTx, err := bc.Database.Begin()
 	if err != nil {
@@ -279,6 +246,39 @@ func (bc *Blockchain) updateUserBalances(txs []Transaction) error {
 	}
 
 	return sqlTx.Commit()
+}
+
+func (bc *Blockchain) ValidateTransaction(tx *Transaction) error {
+	if tx.IsCoinbase {
+		return nil
+	}
+
+	balance, err := bc.GetBalance(tx.From)
+	if err != nil {
+		return err
+	}
+
+	if balance >= tx.Amount {
+		return nil
+	}
+
+	return errors.New("balance is insufficient")
+}
+
+func getUserPendingOutgoing(address string, mempoolTxs []Transaction) uint64 {
+	var pending uint64
+
+	for _, tx := range mempoolTxs {
+		if tx.IsCoinbase {
+			continue
+		}
+
+		if tx.From == address {
+			pending += tx.Amount
+		}
+	}
+
+	return pending
 }
 
 func isGenesisBlock(id int64) bool {
