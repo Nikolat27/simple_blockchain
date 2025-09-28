@@ -26,14 +26,24 @@ func main() {
 	}
 	defer dbInstance.Close()
 
-	var newBc *blockchain.Blockchain
-	var newMempool *blockchain.Mempool
+	mempool := blockchain.NewMempool()
 
-	newBc = blockchain.NewBlockchain(dbInstance)
-	newMempool = blockchain.NewMempool()
+	// Try to load existing blockchain
+	bc, err := blockchain.LoadBlockchain(dbInstance, mempool)
+	if err != nil {
+		panic(err)
+	}
+
+	// If no blocks exist, create new blockchain with genesis block
+	if len(bc.Blocks) == 0 {
+		bc, err = blockchain.NewBlockchain(dbInstance, mempool)
+		if err != nil {
+			panic(err)
+		}
+	}
 
 	// http handlers
-	newHandler := handler.New(newBc, newMempool)
+	newHandler := handler.New(bc)
 
 	httpServer := HttpServer.New(Port, newHandler)
 
