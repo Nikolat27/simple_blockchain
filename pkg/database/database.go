@@ -63,7 +63,7 @@ func (sqlite *Database) ClearAllData() error {
 	}
 
 	for _, query := range queries {
-		if _, err := sqlite.db.Exec(query); err != nil {
+		if _, err := tx.Exec(query); err != nil {
 			if err := tx.Rollback(); err != nil {
 				return err
 			}
