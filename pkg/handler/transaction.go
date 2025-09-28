@@ -50,8 +50,8 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 
 	// Sign the transaction with the provided keys
 	if err := newTx.SignWithHexKeys(input.PrivateKey, input.PublicKey); err != nil {
-		utils.WriteJSON(w, http.StatusBadRequest, "Failed to sign transaction: "+err.Error())
-		return
+	 	utils.WriteJSON(w, http.StatusBadRequest, "Failed to sign transaction: "+err.Error())
+	 	return
 	}
 
 	if !newTx.Verify() {
@@ -64,7 +64,7 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.Mempool.AddTransaction(&newTx)
+	handler.Blockchain.Mempool.AddTransaction(&newTx)
 
 	resp := map[string]string{
 		"message": "Transaction added to mempool",
@@ -75,7 +75,7 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
-	transactions := handler.Mempool.GetTransactions()
+	transactions := handler.Blockchain.Mempool.GetTransactions()
 
 	resp := map[string]any{
 		"transactions": transactions,
