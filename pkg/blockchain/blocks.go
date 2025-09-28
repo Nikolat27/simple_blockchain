@@ -3,45 +3,58 @@ package blockchain
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 )
 
 type Block struct {
-	Index        int           `json:"index"`
+	Id           int64         `json:"id"`
 	PrevHash     []byte        `json:"prev_hash"`
 	Hash         []byte        `json:"hash"`
-	Timestamp    time.Time     `json:"timestamp"`
-	Nonce        int           `json:"nonce"`
-	Transactions []Transaction `json:"transactions"`
+	Timestamp    int64         `json:"timestamp"`
+	Nonce        int64         `json:"nonce"`
+	Transactions []Transaction `json:"transactions,omitempty"`
 }
 
-func (block *Block) HashBlock() {
+func (block *Block) HashBlock() error {
 	prevHashStr := hex.EncodeToString(block.PrevHash)
 
-	record := fmt.Sprintf("%d-%s-%s-%d-%v", block.Index, prevHashStr,
-		block.Timestamp, block.Nonce, block.Transactions)
+	// Create a deterministic string representation of transactions
+	txData, err := json.Marshal(block.Transactions)
+	if err != nil {
+		return err
+	}
+
+	record := fmt.Sprintf("%d-%s-%d-%d-%s", block.Id, prevHashStr,
+		block.Timestamp, block.Nonce, string(txData))
 
 	hash := sha256.Sum256([]byte(record))
 
 	block.Hash = hash[:]
+
+	return nil
 }
 
 func (block *Block) IsValidHash() bool {
 	hashStr := hex.EncodeToString(block.Hash)
+
 	return strings.HasPrefix(hashStr, strings.Repeat("0", Difficulty))
 }
 
-func createGenesisBlock() *Block {
+func createGenesisBlock() (*Block, error) {
 	block := &Block{
-		Index:        0,
+		Id:           0,
 		PrevHash:     make([]byte, 32),
-		Timestamp:    time.Now(),
+		Timestamp:    time.Now().Unix(),
 		Transactions: []Transaction{},
 		Nonce:        0,
 	}
 
-	block.HashBlock()
-	return block
+	if err := block.HashBlock(); err != nil {
+		return nil, err
+	}
+
+	return block, nil
 }
