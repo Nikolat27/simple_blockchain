@@ -15,7 +15,7 @@ type Transaction struct {
 	Timestamp  int64
 	PublicKey  string // sender's public key (hex string)
 	Signature  []byte // Ed25519 signature
-	Fee        float64
+	Fee        uint64
 	Status     string `json:"status"`
 	IsCoinbase bool   `json:"is_coinbase"`
 }

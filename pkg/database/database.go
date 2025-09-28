@@ -51,6 +51,11 @@ func (sqlite *Database) Begin() (*sql.Tx, error) {
 
 // ClearAllData removes all blockchain data (used when corruption is detected)
 func (sqlite *Database) ClearAllData() error {
+	tx, err := sqlite.Begin()
+	if err != nil {
+		return err
+	}
+
 	queries := []string{
 		"DELETE FROM transactions",
 		"DELETE FROM blocks",
@@ -59,9 +64,13 @@ func (sqlite *Database) ClearAllData() error {
 
 	for _, query := range queries {
 		if _, err := sqlite.db.Exec(query); err != nil {
+			if err := tx.Rollback(); err != nil {
+				return err
+			}
+
 			return err
 		}
 	}
 
-	return nil
+	return tx.Commit()
 }

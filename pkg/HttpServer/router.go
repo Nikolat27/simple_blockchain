@@ -21,7 +21,8 @@ func newRouter(handler *handler.Handler) *Router {
 		r.Get("/balance", handler.GetBalance)
 		r.Get("/blocks", handler.GetAllBlocks)
 
-		r.Get("/transactions", handler.GetTransactions)
+		r.Get("/txs", handler.GetTransactions)
+		r.Get("/tx/fee", handler.GetCurrentTxFee)
 
 		r.Post("/keys", handler.GenerateKeys)
 	})

@@ -25,21 +25,21 @@ func (sqlite *Database) GetConfirmedBalance(address string) (uint64, error) {
 	return balance, nil
 }
 
-func (sqlite *Database) IncreaseUserBalance(address string, amount uint64) error {
+func (sqlite *Database) IncreaseUserBalance(tx *sql.Tx, address string, amount uint64) error {
 	query := ` 
 		INSERT INTO balances(address, balance)
 		VALUES (?, ?)
 		ON CONFLICT (address) DO UPDATE SET balance = balance + excluded.balance	
 	`
 
-	if _, err := sqlite.db.Exec(query, address, amount); err != nil {
+	if _, err := tx.Exec(query, address, amount); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (sqlite *Database) DecreaseUserBalance(address string, amount uint64) error {
+func (sqlite *Database) DecreaseUserBalance(tx *sql.Tx, address string, amount uint64) error {
 	query := `
 		INSERT INTO balances(address, balance)
 		VALUES (?, ?)
@@ -50,7 +50,7 @@ func (sqlite *Database) DecreaseUserBalance(address string, amount uint64) error
 		END;
 	`
 
-	result, err := sqlite.db.Exec(query, address, amount)
+	result, err := tx.Exec(query, address, amount)
 
 	if err != nil {
 		return err

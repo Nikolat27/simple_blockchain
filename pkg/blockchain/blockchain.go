@@ -10,8 +10,8 @@ import (
 	"sync"
 )
 
-const MiningReward = 5
-const Difficulty = 5
+const MiningReward = 10000
+const Difficulty = 4
 
 type Blockchain struct {
 	Blocks []Block `json:"blocks"`
@@ -111,6 +111,7 @@ func (bc *Blockchain) AddBlock(newBlock *Block) {
 			From:       tx.From,
 			To:         tx.To,
 			Amount:     tx.Amount,
+			Fee:        tx.Fee,
 			Timestamp:  tx.Timestamp,
 			PublicKey:  tx.PublicKey,
 			Signature:  tx.Signature,
@@ -225,22 +226,35 @@ func (bc *Blockchain) updateUserBalances(txs []Transaction) error {
 
 	defer sqlTx.Rollback()
 
+	// Calculate total fees from all transactions in this block
+	var totalFees uint64
+
+	for _, tx := range txs {
+		if !tx.IsCoinbase {
+			totalFees += tx.Fee
+		}
+	}
+
 	for _, tx := range txs {
 		if tx.IsCoinbase {
-			if err := bc.Database.IncreaseUserBalance(tx.To, tx.Amount); err != nil {
+			// Credit miner with mining reward + total fees from this block
+			minerReward := tx.Amount + totalFees
+			if err := bc.Database.IncreaseUserBalance(sqlTx, tx.To, minerReward); err != nil {
 				return fmt.Errorf("failed to credit miner %s: %w", tx.To, err)
 			}
-
 			continue
 		}
 
-		if err := bc.Database.DecreaseUserBalance(tx.From, tx.Amount); err != nil {
+		// For regular transactions: sender pays amount + fee
+		totalDebit := tx.Amount + tx.Fee
+		if err := bc.Database.DecreaseUserBalance(sqlTx, tx.From, totalDebit); err != nil {
 			return fmt.Errorf("failed to debit sender %s: %w", tx.From, err)
 		}
 
+		// Credit receiver with the transaction amount
 		if tx.To != "" {
-			if err := bc.Database.IncreaseUserBalance(tx.To, tx.Amount); err != nil {
-				return fmt.Errorf("failed to credit receiver %s: %w", tx.From, err)
+			if err := bc.Database.IncreaseUserBalance(sqlTx, tx.To, tx.Amount); err != nil {
+				return fmt.Errorf("failed to credit receiver %s: %w", tx.To, err)
 			}
 		}
 	}
@@ -258,7 +272,8 @@ func (bc *Blockchain) ValidateTransaction(tx *Transaction) error {
 		return err
 	}
 
-	if balance >= tx.Amount {
+	totalCost := tx.Amount + tx.Fee
+	if balance >= totalCost {
 		return nil
 	}
 
@@ -274,7 +289,7 @@ func getUserPendingOutgoing(address string, mempoolTxs []Transaction) uint64 {
 		}
 
 		if tx.From == address {
-			pending += tx.Amount
+			pending += tx.Amount + tx.Fee // Include both amount and fee
 		}
 	}
 

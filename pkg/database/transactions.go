@@ -9,6 +9,7 @@ type DBTransactionSchema struct {
 	From       string
 	To         string
 	Amount     uint64
+	Fee        uint64
 	Timestamp  int64
 	PublicKey  string
 	Signature  []byte
@@ -18,7 +19,7 @@ type DBTransactionSchema struct {
 
 func (sqlite *Database) GetTransactionsByBlockId(blockId int) ([]DBTransactionSchema, error) {
 	query := `
-		SELECT sender, recipient, amount, timestamp, public_key, signature, status, is_coin_base
+		SELECT sender, recipient, amount, fee, timestamp, public_key, signature, status, is_coin_base
 		FROM transactions
 		WHERE block_id = ?
 		ORDER BY id ASC
@@ -37,7 +38,7 @@ func (sqlite *Database) GetTransactionsByBlockId(blockId int) ([]DBTransactionSc
 		var publicKey sql.NullString
 		var signature sql.NullString
 
-		err := rows.Scan(&sender, &tx.To, &tx.Amount, &tx.Timestamp,
+		err := rows.Scan(&sender, &tx.To, &tx.Amount, &tx.Fee, &tx.Timestamp,
 			&publicKey, &signature, &tx.Status, &tx.IsCoinbase)
 		if err != nil {
 			return nil, err
@@ -65,8 +66,8 @@ func (sqlite *Database) GetTransactionsByBlockId(blockId int) ([]DBTransactionSc
 
 func (sqlite *Database) AddTransaction(tx DBTransactionSchema, blockId int) error {
 	query := `
-		INSERT INTO transactions(block_id, sender, recipient, amount, timestamp, public_key, signature, status, is_coin_base)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO transactions(block_id, sender, recipient, amount, fee, timestamp, public_key, signature, status, is_coin_base)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	var sender interface{} = nil
@@ -84,7 +85,7 @@ func (sqlite *Database) AddTransaction(tx DBTransactionSchema, blockId int) erro
 		signature = string(tx.Signature)
 	}
 
-	_, err := sqlite.db.Exec(query, blockId, sender, tx.To, tx.Amount, tx.Timestamp,
+	_, err := sqlite.db.Exec(query, blockId, sender, tx.To, tx.Amount, tx.Fee, tx.Timestamp,
 		publicKey, signature, tx.Status, tx.IsCoinbase)
 
 	return err

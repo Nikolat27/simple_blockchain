@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"simple_blockchain/pkg/database"
 	"strings"
-	"time"
 )
 
 type Block struct {
@@ -53,6 +52,7 @@ func (block *Block) parseDBTransactions(dbTxs []database.DBTransactionSchema) {
 			From:       dbTx.From,
 			To:         dbTx.To,
 			Amount:     dbTx.Amount,
+			Fee:        dbTx.Fee,
 			Timestamp:  dbTx.Timestamp,
 			PublicKey:  dbTx.PublicKey,
 			Signature:  dbTx.Signature,
@@ -66,7 +66,7 @@ func createGenesisBlock() (*Block, error) {
 	block := &Block{
 		Id:           0,
 		PrevHash:     make([]byte, 32),
-		Timestamp:    time.Now().Unix(),
+		Timestamp:    1609459200, // Fixed timestamp: 2021-01-01 00:00:00 UTC
 		Transactions: []Transaction{},
 		Nonce:        0,
 	}

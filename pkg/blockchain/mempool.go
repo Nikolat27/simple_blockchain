@@ -1,15 +1,17 @@
 package blockchain
 
 import (
+	"sort"
 	"sync"
 )
 
 type Mempool struct {
 	transactions []Transaction
-	Mutex        sync.RWMutex // Protects concurrent access to transactions
+	Mutex        sync.RWMutex
 }
 
-const BaseTxFee = 0.02 // 0.02%
+const BaseTxFee = 25  // 0.25%
+const HighTxFee = 200 // 2%
 
 func NewMempool() *Mempool {
 	return &Mempool{
@@ -35,6 +37,13 @@ func (mp *Mempool) GetTransactions() []Transaction {
 	return transactions
 }
 
+// SortTxsByFee -> sort transactions in DESC order by their fee
+func SortTxsByFee(txs *[]Transaction) {
+	sort.Slice(*txs, func(i, j int) bool {
+		return (*txs)[i].Fee > (*txs)[j].Fee
+	})
+}
+
 func (mp *Mempool) Clear() {
 	mp.Mutex.Lock()
 	defer mp.Mutex.Unlock()
@@ -42,12 +51,37 @@ func (mp *Mempool) Clear() {
 	mp.transactions = []Transaction{}
 }
 
-func (mp *Mempool) CalculateTxFee() float64 {
-	baseTx := BaseTxFee
+func (mp *Mempool) CalculateTxFee() uint64 {
+	mp.Mutex.Lock()
+	defer mp.Mutex.Unlock()
 
 	if len(mp.transactions) > 100 {
-		baseTx = 2 // 2%
+		return HighTxFee
 	}
 
-	return baseTx
+	return BaseTxFee
+}
+
+func (mp *Mempool) CalculateFee(amount uint64) uint64 {
+	txFee := mp.CalculateTxFee()
+
+	feeAmount := (amount * txFee) / 10000
+
+	if feeAmount == 0 {
+		feeAmount = 1
+	}
+
+	return feeAmount
+}
+
+func (mp *Mempool) CalculateFinalAmount(amount uint64) uint64 {
+	txFee := mp.CalculateTxFee()
+
+	finalTxFee := (amount * txFee) / 10000 // 100%
+
+	if finalTxFee == 0 {
+		finalTxFee = 1
+	}
+
+	return amount - finalTxFee
 }

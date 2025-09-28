@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS transactions
     sender       TEXT    NULL,
     recipient    TEXT    NOT NULL,
     amount       INTEGER          DEFAULT (0),
+    fee          INTEGER          DEFAULT (0),
     timestamp    INTEGER          DEFAULT (strftime('%s', 'now')),
     public_key   TEXT    NULL,
     signature    TEXT    NULL,

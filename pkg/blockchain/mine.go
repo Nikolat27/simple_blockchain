@@ -17,6 +17,8 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 		default:
 			transactions := mempool.GetTransactions()
 
+			SortTxsByFee(&transactions)
+
 			coinBaseTx := createCoinbaseTx(minerAddress, MiningReward)
 
 			allTransactions := append([]Transaction{*coinBaseTx}, transactions...)
