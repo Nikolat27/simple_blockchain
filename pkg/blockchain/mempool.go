@@ -9,6 +9,8 @@ type Mempool struct {
 	Mutex        sync.RWMutex // Protects concurrent access to transactions
 }
 
+const BaseTxFee = 0.02 // 0.02%
+
 func NewMempool() *Mempool {
 	return &Mempool{
 		transactions: make([]Transaction, 0),
@@ -38,4 +40,14 @@ func (mp *Mempool) Clear() {
 	defer mp.Mutex.Unlock()
 
 	mp.transactions = []Transaction{}
+}
+
+func (mp *Mempool) CalculateTxFee() float64 {
+	baseTx := BaseTxFee
+
+	if len(mp.transactions) > 100 {
+		baseTx = 2 // 2%
+	}
+
+	return baseTx
 }
