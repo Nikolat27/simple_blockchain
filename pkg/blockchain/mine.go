@@ -50,6 +50,7 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 
 			if err := bc.updateUserBalances(newBlock.Transactions); err != nil {
 				log.Printf("failed to update the user balances: %v\n", err)
+				return nil
 			}
 
 			mempool.Clear()
