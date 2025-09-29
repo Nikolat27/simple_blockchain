@@ -2,13 +2,13 @@ package database
 
 import "database/sql"
 
-func (db *Database) AddBlock(dbTx *sql.Tx, prevHash, hash string, nonce, timestamp, blockHeight int64) (int64, error) {
+func (db *Database) AddBlock(sqlTx *sql.Tx, prevHash, hash string, nonce, timestamp, blockHeight int64) (int64, error) {
 	query := `
 		INSERT INTO blocks(prev_hash, hash, nonce, timestamp, block_height)
 		VALUES (?, ?, ?, ?, ?)
 	`
 
-	result, err := dbTx.Exec(query, prevHash, hash, nonce, timestamp, blockHeight)
+	result, err := sqlTx.Exec(query, prevHash, hash, nonce, timestamp, blockHeight)
 	if err != nil {
 		return 0, err
 	}
