@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -33,41 +34,53 @@ func LoadBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
 		return nil, err
 	}
 
-	// database is empty
-	if len(blocks) == 0 {
-		return bc, nil
+	allBlocksValid, err := bc.verifyBlocks(blocks)
+	if err != nil {
+		return nil, err
 	}
 
-	allBlocksValid := true
+	// If any block failed verification, clear database and start fresh
+	if !allBlocksValid {
+		return startFresh(db)
+	}
+
+	return bc, nil
+}
+
+func (bc *Blockchain) verifyBlocks(blocks []Block) (bool, error) {
+	// database is empty
+	if len(blocks) == 0 {
+		return true, nil
+	}
+
 	for _, block := range blocks {
-		isVerified, err := bc.VerifyBlock(&block)
+		isVerified, err := bc.verifyBlock(&block)
 		if err != nil {
-			return nil, err
+			return false, err
 		}
 
 		if !isVerified {
-			allBlocksValid = false
-			break // If any block is invalid, don't trust the chain
+			return false, nil
 		}
 
 		bc.Blocks = append(bc.Blocks, block)
 	}
 
-	// If any block failed verification, clear database and start fresh
-	if !allBlocksValid {
-		log.Println("Found corrupted blockchain data, clearing database")
-		if err := db.ClearAllData(); err != nil {
-			return nil,
-				fmt.Errorf("ERROR clearing corrupted data: %v", err)
-		}
+	return true, nil
+}
 
-		return &Blockchain{
-			Blocks:   make([]Block, 0),
-			Database: db,
-		}, nil
+func startFresh(db *database.Database) (*Blockchain, error) {
+	log.Println("Found corrupted blockchain data, clearing database")
+
+	// ClearAllData -> Flush the database
+	if err := db.ClearAllData(); err != nil {
+		return nil, fmt.Errorf("ERROR clearing corrupted data: %v", err)
 	}
 
-	return bc, nil
+	return &Blockchain{
+		Blocks:   make([]Block, 0),
+		Database: db,
+	}, nil
 }
 
 func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
@@ -141,35 +154,12 @@ func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
 
 	var blocks []Block
 	for rows.Next() {
-		var block Block
-		var prevHashStr, hashStr string
-		var dbId int // database ID (index), not used for block identification
-
-		if err := rows.Scan(&dbId, &prevHashStr,
-			&hashStr, &block.Nonce, &block.Timestamp, &block.Id); err != nil {
-
-			return nil, err
-		}
-
-		block.PrevHash, err = hex.DecodeString(prevHashStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode 'prevHashStr': %v", err)
-		}
-
-		block.Hash, err = hex.DecodeString(hashStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode 'hashStr': %v", err)
-		}
-
-		// Load transactions for this block using database ID
-		dbTransactions, err := bc.Database.GetTransactionsByBlockId(dbId)
+		block, err := bc.parseBlock(rows)
 		if err != nil {
 			return nil, err
 		}
 
-		block.parseDBTransactions(dbTransactions)
-
-		blocks = append(blocks, block)
+		blocks = append(blocks, *block)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -179,7 +169,42 @@ func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
 	return blocks, nil
 }
 
-func (bc *Blockchain) VerifyBlock(block *Block) (bool, error) {
+func (bc *Blockchain) parseBlock(rows *sql.Rows) (*Block, error) {
+	var block Block
+
+	var prevHashStr, hashStr string
+	var dbId int // database ID (index), not used for block identification
+
+	if err := rows.Scan(&dbId, &prevHashStr,
+		&hashStr, &block.Nonce, &block.Timestamp, &block.Id); err != nil {
+
+		return nil, err
+	}
+
+	var err error
+
+	block.PrevHash, err = hex.DecodeString(prevHashStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode 'prevHashStr': %v", err)
+	}
+
+	block.Hash, err = hex.DecodeString(hashStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode 'hashStr': %v", err)
+	}
+
+	// Load transactions for this block using database ID
+	dbTransactions, err := bc.Database.GetTransactionsByBlockId(dbId)
+	if err != nil {
+		return nil, err
+	}
+
+	block.parseDBTransactions(dbTransactions)
+
+	return &block, nil
+}
+
+func (bc *Blockchain) verifyBlock(block *Block) (bool, error) {
 	tempBlock := &Block{
 		Id:           block.Id,
 		PrevHash:     block.PrevHash,
