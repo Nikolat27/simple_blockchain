@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
+func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		From       string `json:"from"`
 		To         string `json:"to"`
