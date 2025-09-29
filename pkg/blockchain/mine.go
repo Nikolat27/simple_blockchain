@@ -68,7 +68,7 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 
 		bc.Mutex.Lock()
 		bc.Blocks = append(bc.Blocks, *newBlock)
-		bc.Mutex.Lock()
+		bc.Mutex.Unlock()
 
 		mempool.Clear()
 		fmt.Println("Mined a block")
