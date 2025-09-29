@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-func (sqlite *Database) GetConfirmedBalance(address string) (uint64, error) {
+func (db *Database) GetConfirmedBalance(address string) (uint64, error) {
 	query := `
 		SELECT balance
 		FROM balances
@@ -14,7 +14,7 @@ func (sqlite *Database) GetConfirmedBalance(address string) (uint64, error) {
 	`
 
 	var balance uint64
-	if err := sqlite.db.QueryRow(query, address).Scan(&balance); err != nil {
+	if err := db.db.QueryRow(query, address).Scan(&balance); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}
@@ -25,7 +25,7 @@ func (sqlite *Database) GetConfirmedBalance(address string) (uint64, error) {
 	return balance, nil
 }
 
-func (sqlite *Database) IncreaseUserBalance(tx *sql.Tx, address string, amount uint64) error {
+func (db *Database) IncreaseUserBalance(tx *sql.Tx, address string, amount uint64) error {
 	query := `
 		INSERT INTO balances(address, balance)
 		VALUES (?, ?)
@@ -39,12 +39,12 @@ func (sqlite *Database) IncreaseUserBalance(tx *sql.Tx, address string, amount u
 	return nil
 }
 
-func (sqlite *Database) DecreaseUserBalance(tx *sql.Tx, address string, amount uint64) error {
+func (db *Database) DecreaseUserBalance(tx *sql.Tx, address string, amount uint64) error {
 	// First, check if balance is sufficient
 	var currentBalance uint64
 	checkQuery := `SELECT balance FROM balances WHERE address = ?`
-	err := tx.QueryRow(checkQuery, address).Scan(&currentBalance)
-	if err != nil {
+
+	if err := tx.QueryRow(checkQuery, address).Scan(&currentBalance); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("insufficient balance for address %s", address)
 		}
@@ -57,6 +57,7 @@ func (sqlite *Database) DecreaseUserBalance(tx *sql.Tx, address string, amount u
 
 	// If sufficient, perform the update
 	updateQuery := `UPDATE balances SET balance = balance - ? WHERE address = ?`
-	_, err = tx.Exec(updateQuery, amount, address)
+	_, err := tx.Exec(updateQuery, amount, address)
+
 	return err
 }
