@@ -152,10 +152,15 @@ func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
 	}
 	defer rows.Close()
 
-	var blocks []Block
+	blocksCount, err := bc.Database.GetBlocksCount()
+	if err != nil {
+		return nil, err
+	}
+
+	blocks := make([]Block, 0, blocksCount)
 	for rows.Next() {
 		block, err := bc.parseBlock(rows)
-		if err != nil {
+		if err != nil {~
 			return nil, err
 		}
 
