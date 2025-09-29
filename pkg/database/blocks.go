@@ -23,8 +23,8 @@ func (db *Database) AddBlock(prevHash, hash string, nonce, timestamp, blockHeigh
 
 func (db *Database) GetAllBlocks() (*sql.Rows, error) {
 	query := `
-		SELECT id, prev_hash, hash, nonce, timestamp, block_height FROM blocks ORDER BY block_height ASC
-	`
+			SELECT id, prev_hash, hash, nonce, timestamp, block_height FROM blocks ORDER BY block_height
+		`
 
 	rows, err := db.db.Query(query)
 	if err != nil {
@@ -32,4 +32,17 @@ func (db *Database) GetAllBlocks() (*sql.Rows, error) {
 	}
 
 	return rows, nil
+}
+
+func (db *Database) GetBlocksCount() (int64, error) {
+	query := `
+		SELECT COUNT(*) FROM blocks
+	`
+
+	var count int64
+	if err := db.db.QueryRow(query).Scan(&count); err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }

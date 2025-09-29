@@ -160,7 +160,7 @@ func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
 	blocks := make([]Block, 0, blocksCount)
 	for rows.Next() {
 		block, err := bc.parseBlock(rows)
-		if err != nil {~
+		if err != nil {
 			return nil, err
 		}
 
