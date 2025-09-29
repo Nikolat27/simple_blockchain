@@ -11,7 +11,7 @@ import (
 )
 
 const MiningReward = 10000
-const Difficulty = 4
+const Difficulty = 5
 
 type Blockchain struct {
 	Blocks []Block `json:"blocks"`
@@ -82,12 +82,14 @@ func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
 		return nil, err
 	}
 
-	bc.AddBlock(genesisBlock)
+	if err := bc.AddBlock(genesisBlock); err != nil {
+		return nil, err
+	}
 
 	return bc, nil
 }
 
-func (bc *Blockchain) AddBlock(newBlock *Block) {
+func (bc *Blockchain) AddBlock(newBlock *Block) error {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
 
@@ -101,12 +103,12 @@ func (bc *Blockchain) AddBlock(newBlock *Block) {
 		newBlock.Timestamp, newBlock.Id)
 
 	if err != nil {
-		log.Printf("ERROR adding block: %v\n", err)
-		return
+		return fmt.Errorf("ERROR adding block: %v\n", err)
 	}
 
-	// Add all transactions for this block
 	for _, tx := range newBlock.Transactions {
+		signatureStr := hex.EncodeToString(tx.Signature)
+
 		dbTx := database.DBTransactionSchema{
 			From:       tx.From,
 			To:         tx.To,
@@ -114,16 +116,17 @@ func (bc *Blockchain) AddBlock(newBlock *Block) {
 			Fee:        tx.Fee,
 			Timestamp:  tx.Timestamp,
 			PublicKey:  tx.PublicKey,
-			Signature:  tx.Signature,
+			Signature:  signatureStr,
 			Status:     "confirmed",
 			IsCoinbase: tx.IsCoinbase,
 		}
 
 		if err := bc.Database.AddTransaction(dbTx, int(blockId)); err != nil {
-			log.Printf("error adding transaction: %v\n", err)
+			return fmt.Errorf("ERROR adding transaction: %v\n", err)
 		}
 	}
 
+	return nil
 }
 
 func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
@@ -207,13 +210,19 @@ func (bc *Blockchain) GetBalance(address string) (uint64, error) {
 		return 0, err
 	}
 
+	log.Println("Confirmed Balance: ", confirmedBalance)
+
 	pendingOutgoing := getUserPendingOutgoing(address, mempoolTxs)
+
+	log.Println("Pending outgoing: ", pendingOutgoing)
 
 	if confirmedBalance < pendingOutgoing {
 		return 0, nil
 	}
 
 	effectiveBalance := confirmedBalance - pendingOutgoing
+
+	log.Println("Effective balance: ", effectiveBalance)
 
 	return effectiveBalance, nil
 }
