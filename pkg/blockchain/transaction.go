@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"simple_blockchain/pkg/crypto"
+	"time"
 )
 
 const CoinbaseTxFee = 0
@@ -64,6 +65,7 @@ func createCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
 		To:         minerAddress,
 		Amount:     miningReward,
 		Fee:        CoinbaseTxFee,
+		Timestamp:  time.Now().Unix(),
 		Status:     "confirmed",
 		IsCoinbase: true,
 	}
