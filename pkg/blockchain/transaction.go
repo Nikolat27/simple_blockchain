@@ -3,9 +3,10 @@ package blockchain
 import (
 	"crypto/sha256"
 	"encoding/json"
-	"errors"
 	"simple_blockchain/pkg/crypto"
 )
+
+const CoinbaseTxFee = 0
 
 type Transaction struct {
 	From       string `json:"from,omitempty"`
@@ -14,6 +15,7 @@ type Transaction struct {
 	Timestamp  int64
 	PublicKey  string // sender's public key (hex string)
 	Signature  []byte // Ed25519 signature
+	Fee        uint64
 	Status     string `json:"status"`
 	IsCoinbase bool   `json:"is_coinbase"`
 }
@@ -42,7 +44,7 @@ func (tx *Transaction) SignWithHexKeys(privateKeyHex, publicKeyHex string) error
 		return err
 	}
 
-	tx.PublicKey = keyPair.GetPublicKeyHex() // Set PublicKey BEFORE hashing
+	tx.PublicKey = keyPair.GetPublicKeyHex()
 	hash := tx.hash()
 	tx.Signature = keyPair.Sign(hash)
 	return nil
@@ -57,19 +59,12 @@ func (tx *Transaction) Verify() bool {
 	return crypto.VerifySignature(tx.PublicKey, hash, tx.Signature)
 }
 
-func (bc *Blockchain) ValidateTransaction(tx *Transaction) error {
-	if tx.IsCoinbase {
-		return nil
+func createCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
+	return &Transaction{
+		To:         minerAddress,
+		Amount:     miningReward,
+		Fee:        CoinbaseTxFee,
+		Status:     "confirmed",
+		IsCoinbase: true,
 	}
-
-	balance, err := bc.GetBalance(tx.From)
-	if err != nil {
-		return err
-	}
-
-	if balance >= tx.Amount {
-		return nil
-	}
-
-	return errors.New("balance is insufficient")
 }

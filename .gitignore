@@ -2,3 +2,5 @@
 
 # SQLite database
 *.sqlite
+
+.env

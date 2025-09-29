@@ -17,14 +17,11 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 		default:
 			transactions := mempool.GetTransactions()
 
-			coinBaseTx := Transaction{
-				To:         minerAddress,
-				Amount:     MiningReward,
-				Status:     "confirmed",
-				IsCoinbase: true,
-			}
+			SortTxsByFee(&transactions)
 
-			allTransactions := append([]Transaction{coinBaseTx}, transactions...)
+			coinBaseTx := createCoinbaseTx(minerAddress, MiningReward)
+
+			allTransactions := append([]Transaction{*coinBaseTx}, transactions...)
 
 			bc.mu.RLock()
 			prevHash := getPreviousBlockHash(bc.Blocks)
@@ -32,14 +29,19 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 			bc.mu.RUnlock()
 
 			newBlock := &Block{
-				Index:        blockIndex,
+				Id:           int64(blockIndex),
 				PrevHash:     prevHash,
-				Timestamp:    time.Now(),
+				Timestamp:    time.Now().Unix(),
 				Transactions: allTransactions,
 				Nonce:        0,
 			}
 
-			if !proofOfWork(ctx, newBlock) {
+			isBlockMined, err := proofOfWork(ctx, newBlock)
+			if err != nil {
+				log.Println(err)
+			}
+
+			if !isBlockMined {
 				return nil // cancelled
 			}
 
@@ -48,6 +50,7 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 
 			if err := bc.updateUserBalances(newBlock.Transactions); err != nil {
 				log.Printf("failed to update the user balances: %v\n", err)
+				return nil
 			}
 
 			mempool.Clear()
@@ -55,16 +58,20 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 	}
 }
 
-func proofOfWork(ctx context.Context, block *Block) bool {
+func proofOfWork(ctx context.Context, block *Block) (bool, error) {
 	for {
 		select {
 		case <-ctx.Done():
 			fmt.Println("POW operation cancelled")
-			return false
+			return false, nil
 		default:
-			block.HashBlock()
+			if err := block.HashBlock(); err != nil {
+				return false, err
+			}
+
 			if block.IsValidHash() {
-				return true
+				fmt.Println("Mined a block")
+				return true, nil
 			}
 
 			block.Nonce++

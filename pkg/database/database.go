@@ -2,15 +2,13 @@ package database
 
 import (
 	"database/sql"
-	"errors"
-	"fmt"
 
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 type Database struct {
-	DB *sql.DB
+	db *sql.DB
 }
 
 func New(driverName, dataSourceName string) (*Database, error) {
@@ -19,7 +17,7 @@ func New(driverName, dataSourceName string) (*Database, error) {
 	}
 
 	if dataSourceName == "" {
-		dataSourceName = "./blockchain_db.sqlite2"
+		dataSourceName = "./blockchain_db.sqlite"
 	}
 
 	db, err := sql.Open(driverName, dataSourceName)
@@ -28,75 +26,51 @@ func New(driverName, dataSourceName string) (*Database, error) {
 	}
 
 	return &Database{
-		DB: db,
+		db: db,
 	}, nil
 }
 
 func (sqlite *Database) Close() error {
-	return sqlite.DB.Close()
+	return sqlite.db.Close()
 }
 
 func (sqlite *Database) Version() (string, error) {
 	var version string
 
-	if err := sqlite.DB.QueryRow("SELECT sqlite_version()").Scan(&version); err != nil {
+	if err := sqlite.db.QueryRow("SELECT sqlite_version()").Scan(&version); err != nil {
 		return "", err
 	}
 
 	return version, nil
 }
 
-func (sqlite *Database) GetBalance(address string) (uint64, error) {
-	query := `
-		SELECT balance
-		FROM balances
-		WHERE address = ?
-	`
+// Begin -> For isolation level
+func (sqlite *Database) Begin() (*sql.Tx, error) {
+	return sqlite.db.Begin()
+}
 
-	var balance uint64
-	if err := sqlite.DB.QueryRow(query, address).Scan(&balance); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, nil
+// ClearAllData removes all blockchain data (used when corruption is detected)
+func (sqlite *Database) ClearAllData() error {
+	tx, err := sqlite.Begin()
+	if err != nil {
+		return err
+	}
+
+	queries := []string{
+		"DELETE FROM transactions",
+		"DELETE FROM blocks",
+		"DELETE FROM balances",
+	}
+
+	for _, query := range queries {
+		if _, err := tx.Exec(query); err != nil {
+			if err := tx.Rollback(); err != nil {
+				return err
+			}
+
+			return err
 		}
-
-		return 0, err
 	}
 
-	return balance, nil
-}
-
-func (sqlite *Database) IncreaseUserBalance(address string, amount uint64) error {
-	query := ` 
-		INSERT INTO balances(address, balance)
-		VALUES (?, ?)
-		ON CONFLICT (address) DO UPDATE SET balance = balance + excluded.balance	
-	`
-
-	_, err := sqlite.DB.Exec(query, address, amount)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (sqlite *Database) DecreaseUserBalance(address string, amount uint64) error {
-	query := `
-		INSERT INTO balances(address, balance)
-		VALUES (?, ?)
-		ON CONFLICT (address) DO UPDATE SET balance = balance + excluded.balance
-	`
-
-	result, err := sqlite.DB.Exec(query, address, amount)
-
-	if err != nil {
-		return err
-	}
-
-	if rows, _ := result.RowsAffected(); rows == 0 {
-		return fmt.Errorf("insufficient balance for address %s", address)
-	}
-
-	return nil
+	return tx.Commit()
 }

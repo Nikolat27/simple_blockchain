@@ -17,9 +17,12 @@ func newRouter(handler *handler.Handler) *Router {
 		r.Get("/chain", handler.GetBlockchain)
 		r.Post("/add/tx", handler.AddTransaction)
 		r.Post("/mine", handler.MineBlock)
-		r.Get("/balance", handler.GetBalance)
 
-		r.Get("/transactions", handler.GetTransactions)
+		r.Get("/balance", handler.GetBalance)
+		r.Get("/blocks", handler.GetAllBlocks)
+
+		r.Get("/txs", handler.GetTransactions)
+		r.Get("/tx/fee", handler.GetCurrentTxFee)
 
 		r.Post("/keys", handler.GenerateKeys)
 	})
