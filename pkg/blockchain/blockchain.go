@@ -106,23 +106,40 @@ func (bc *Blockchain) AddBlock(newBlock *Block) error {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
 
-	bc.Blocks = append(bc.Blocks, *newBlock)
+	dbTx, err := bc.Database.BeginTx()
+	if err != nil {
+		return err
+	}
+	defer dbTx.Rollback()
 
 	prevHashStr := hex.EncodeToString(newBlock.PrevHash)
 	hashStr := hex.EncodeToString(newBlock.Hash)
 
 	// Add block to database with block height
-	blockId, err := bc.Database.AddBlock(prevHashStr, hashStr, newBlock.Nonce,
-		newBlock.Timestamp, newBlock.Id)
+	blockId, err := bc.Database.AddBlock(dbTx, prevHashStr, hashStr, newBlock.Nonce, newBlock.Timestamp,
+		newBlock.Id)
 
 	if err != nil {
 		return fmt.Errorf("ERROR adding block: %v\n", err)
 	}
 
-	for _, tx := range newBlock.Transactions {
+	if err := bc.AddTransactions(dbTx, int(blockId), newBlock.Transactions); err != nil {
+		return err
+	}
+
+	if err := dbTx.Commit(); err != nil {
+		return err
+	}
+
+	bc.Blocks = append(bc.Blocks, *newBlock)
+	return nil
+}
+
+func (bc *Blockchain) AddTransactions(dbTx *sql.Tx, blockId int, txs []Transaction) error {
+	for _, tx := range txs {
 		signatureStr := hex.EncodeToString(tx.Signature)
 
-		dbTx := database.DBTransactionSchema{
+		txInstance := database.DBTransactionSchema{
 			From:       tx.From,
 			To:         tx.To,
 			Amount:     tx.Amount,
@@ -134,7 +151,7 @@ func (bc *Blockchain) AddBlock(newBlock *Block) error {
 			IsCoinbase: tx.IsCoinbase,
 		}
 
-		if err := bc.Database.AddTransaction(dbTx, int(blockId)); err != nil {
+		if err := bc.Database.AddTransaction(dbTx, txInstance, blockId); err != nil {
 			return fmt.Errorf("ERROR adding transaction: %v\n", err)
 		}
 	}
@@ -258,7 +275,7 @@ func (bc *Blockchain) GetBalance(address string) (uint64, error) {
 }
 
 func (bc *Blockchain) updateUserBalances(txs []Transaction) error {
-	sqlTx, err := bc.Database.Begin()
+	sqlTx, err := bc.Database.BeginTx()
 	if err != nil {
 		return err
 	}

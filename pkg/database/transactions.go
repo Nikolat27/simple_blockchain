@@ -64,7 +64,7 @@ func (db *Database) GetTransactionsByBlockId(blockId int) ([]DBTransactionSchema
 	return transactions, nil
 }
 
-func (db *Database) AddTransaction(tx DBTransactionSchema, blockId int) error {
+func (db *Database) AddTransaction(dbTx *sql.Tx, tx DBTransactionSchema, blockId int) error {
 	query := `
 		INSERT INTO transactions(block_id, sender, recipient, amount, fee, timestamp, public_key, signature, status, is_coin_base)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -85,7 +85,7 @@ func (db *Database) AddTransaction(tx DBTransactionSchema, blockId int) error {
 		signature = tx.Signature
 	}
 
-	_, err := db.db.Exec(query, blockId, sender, tx.To, tx.Amount, tx.Fee, tx.Timestamp,
+	_, err := dbTx.Exec(query, blockId, sender, tx.To, tx.Amount, tx.Fee, tx.Timestamp,
 		publicKey, signature, tx.Status, tx.IsCoinbase)
 
 	return err

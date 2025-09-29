@@ -44,14 +44,14 @@ func (db *Database) Version() (string, error) {
 	return version, nil
 }
 
-// Begin -> For isolation level
-func (db *Database) Begin() (*sql.Tx, error) {
+// BeginTx -> For isolation level
+func (db *Database) BeginTx() (*sql.Tx, error) {
 	return db.db.Begin()
 }
 
 // ClearAllData removes all blockchain data (used when corruption is detected)
 func (db *Database) ClearAllData() error {
-	tx, err := db.Begin()
+	tx, err := db.BeginTx()
 	if err != nil {
 		return err
 	}
