@@ -40,11 +40,14 @@ func (block *Block) IsValidHash() bool {
 }
 
 // parseDBTransactions -> Convert DB transactions to blockchain transactions
-func (block *Block) parseDBTransactions(dbTxs []database.DBTransactionSchema) {
-	block.Transactions = make([]Transaction, len(dbTxs))
+func (block *Block) parseDBTransactions(dbTxs []database.DBTransactionSchema) error {
+	block.Transactions = make([]Transaction, len(dbTxs), len(dbTxs))
 
 	for idx, dbTx := range dbTxs {
-		decodedSignature, _ := hex.DecodeString(dbTx.Signature)
+		decodedSignature, err := hex.DecodeString(dbTx.Signature)
+		if err != nil {
+			return err
+		}
 
 		block.Transactions[idx] = Transaction{
 			From:       dbTx.From,
@@ -58,6 +61,22 @@ func (block *Block) parseDBTransactions(dbTxs []database.DBTransactionSchema) {
 			IsCoinbase: dbTx.IsCoinbase,
 		}
 	}
+
+	return nil
+}
+
+// SerializeTransactions -> Deterministic
+func (block *Block) SerializeTransactions() string {
+	txs := block.Transactions
+
+	parts := make([]string, len(txs))
+
+	for i, tx := range txs {
+		parts[i] = fmt.Sprintf("%s-%s-%d-%x",
+			tx.From, tx.To, tx.Amount, tx.Signature)
+	}
+
+	return strings.Join(parts, "|")
 }
 
 func createGenesisBlock() (*Block, error) {
@@ -74,18 +93,4 @@ func createGenesisBlock() (*Block, error) {
 	}
 
 	return block, nil
-}
-
-// SerializeTransactions -> Deterministic
-func (block *Block) SerializeTransactions() string {
-	txs := block.Transactions
-
-	parts := make([]string, len(txs))
-
-	for i, tx := range txs {
-		parts[i] = fmt.Sprintf("%s-%s-%d-%x",
-			tx.From, tx.To, tx.Amount, tx.Signature)
-	}
-
-	return strings.Join(parts, "|")
 }

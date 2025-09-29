@@ -15,45 +15,62 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 	default:
 		transactions := mempool.GetTransactions()
 
-		SortTxsByFee(&transactions)
+		// Priority based
+		bc.Mempool.SortTxsByFee(&transactions)
 
 		coinBaseTx := createCoinbaseTx(minerAddress, MiningReward)
 
 		allTransactions := append([]Transaction{*coinBaseTx}, transactions...)
 
-		bc.mu.RLock()
+		bc.Mutex.RLock()
 		prevHash := getPreviousBlockHash(bc.Blocks)
 		blockIndex := len(bc.Blocks)
-		bc.mu.RUnlock()
+		bc.Mutex.RUnlock()
 
 		newBlock := &Block{
 			Id:           int64(blockIndex),
 			PrevHash:     prevHash,
+			Hash:         nil,
 			Timestamp:    time.Now().Unix(),
 			Transactions: allTransactions,
 			Nonce:        0,
 		}
 
-		isBlockMined, err := proofOfWork(ctx, newBlock)
+		// mining started...
+		mined, err := proofOfWork(ctx, newBlock)
 		if err != nil {
 			return nil, fmt.Errorf("ERROR proofOfWork: %v", err)
 		}
 
-		if !isBlockMined {
+		if !mined {
+			fmt.Println("POW operation cancelled")
 			return nil, nil
 		}
 
+		sqlTx, err := bc.Database.BeginTx()
+		if err != nil {
+			return nil, err
+		}
+		defer sqlTx.Rollback()
+
 		// block found
-		if err := bc.AddBlock(newBlock); err != nil {
+		if err := bc.AddBlock(sqlTx, newBlock); err != nil {
 			return nil, err
 		}
 
-		if err := bc.updateUserBalances(newBlock.Transactions); err != nil {
+		if err := bc.updateUserBalances(sqlTx, newBlock.Transactions); err != nil {
 			return nil, fmt.Errorf("ERROR failed to update the user balances: %v\n", err)
 		}
 
-		mempool.Clear()
+		if err := sqlTx.Commit(); err != nil {
+			return nil, err
+		}
 
+		bc.Mutex.Lock()
+		bc.Blocks = append(bc.Blocks, *newBlock)
+		bc.Mutex.Lock()
+
+		mempool.Clear()
 		fmt.Println("Mined a block")
 		return newBlock, nil
 	}
@@ -63,7 +80,7 @@ func proofOfWork(ctx context.Context, block *Block) (bool, error) {
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("POW operation cancelled")
+			// cancelled
 			return false, nil
 		default:
 			if err := block.HashBlock(); err != nil {

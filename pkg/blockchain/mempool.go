@@ -38,7 +38,10 @@ func (mp *Mempool) GetTransactions() []Transaction {
 }
 
 // SortTxsByFee -> sort transactions in DESC order by their fee
-func SortTxsByFee(txs *[]Transaction) {
+func (mp *Mempool) SortTxsByFee(txs *[]Transaction) {
+	mp.Mutex.RLock()
+	defer mp.Mutex.RUnlock()
+
 	sort.Slice(*txs, func(i, j int) bool {
 		return (*txs)[i].Fee > (*txs)[j].Fee
 	})
@@ -72,16 +75,4 @@ func (mp *Mempool) CalculateFee(amount uint64) uint64 {
 	}
 
 	return feeAmount
-}
-
-func (mp *Mempool) CalculateFinalAmount(amount uint64) uint64 {
-	txFee := mp.CalculateTxFee()
-
-	finalTxFee := (amount * txFee) / 10000 // 100%
-
-	if finalTxFee == 0 {
-		finalTxFee = 1
-	}
-
-	return amount - finalTxFee
 }
