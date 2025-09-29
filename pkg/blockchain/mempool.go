@@ -53,7 +53,7 @@ func (mp *Mempool) Clear() {
 
 func (mp *Mempool) CalculateTxFee() uint64 {
 	mp.Mutex.RLock()
-	defer mp.Mutex.RLock()
+	defer mp.Mutex.RUnlock()
 
 	if len(mp.transactions) > 100 {
 		return HighTxFee
