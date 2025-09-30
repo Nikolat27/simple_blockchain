@@ -66,8 +66,8 @@ func (node *Node) handleListening(conn net.Conn) {
 	}
 }
 
-// Write -> Writes to TCP connection
-func (node *Node) Write(peerAddress string, msg []byte) error {
+// WriteMessage -> Writes to TCP connection
+func (node *Node) WriteMessage(peerAddress string, msg []byte) error {
 	conn, err := net.Dial("tcp", peerAddress)
 	if err != nil {
 		return fmt.Errorf("failed to dial peer %s: %w", peerAddress, err)
