@@ -13,10 +13,9 @@ import (
 	"simple_blockchain/pkg/utils"
 )
 
-const Port = "8000"
-
 func main() {
-	tcpPort := flag.String("peerAddress", "8080", "tcp port")
+	httpPort := flag.String("port", "8000", "http port")
+	tcpPort := flag.String("node-port", "8080", "tcp port")
 
 	flag.Parse()
 
@@ -59,7 +58,7 @@ func main() {
 	// http handlers
 	newHandler := handler.New(newNode)
 
-	httpServer := HttpServer.New(Port, newHandler)
+	httpServer := HttpServer.New(*httpPort, newHandler)
 
 	if err := httpServer.Run(); err != nil {
 		log.Fatal(err)
