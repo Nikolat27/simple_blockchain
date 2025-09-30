@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -11,63 +12,14 @@ import (
 )
 
 const MiningReward = 10000
-const Difficulty = 4
+const Difficulty = 5
 
 type Blockchain struct {
 	Blocks []Block `json:"blocks"`
-	mu     sync.RWMutex
+	Mutex  sync.RWMutex
 
 	Database *database.Database
-	Mempool  *Mempool
-}
-
-func LoadBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
-	bc := &Blockchain{
-		Blocks:   make([]Block, 0),
-		Database: db,
-		Mempool:  mp,
-	}
-
-	blocks, err := bc.GetAllBlocks()
-	if err != nil {
-		return nil, err
-	}
-
-	// database is empty
-	if len(blocks) == 0 {
-		return bc, nil
-	}
-
-	allBlocksValid := true
-	for _, block := range blocks {
-		isVerified, err := bc.VerifyBlock(&block)
-		if err != nil {
-			return nil, err
-		}
-
-		if !isVerified {
-			allBlocksValid = false
-			break // If any block is invalid, don't trust the chain
-		}
-
-		bc.Blocks = append(bc.Blocks, block)
-	}
-
-	// If any block failed verification, clear database and start fresh
-	if !allBlocksValid {
-		log.Println("Found corrupted blockchain data, clearing database")
-		if err := db.ClearAllData(); err != nil {
-			return nil,
-				fmt.Errorf("ERROR clearing corrupted data: %v", err)
-		}
-
-		return &Blockchain{
-			Blocks:   make([]Block, 0),
-			Database: db,
-		}, nil
-	}
-
-	return bc, nil
+	Mempool  *Mempool `json:"mempool"`
 }
 
 func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
@@ -82,53 +34,134 @@ func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
 		return nil, err
 	}
 
-	bc.AddBlock(genesisBlock)
+	sqlTx, err := db.BeginTx()
+	if err != nil {
+		return nil, err
+	}
+	defer sqlTx.Rollback()
+
+	if err := bc.AddBlock(sqlTx, genesisBlock); err != nil {
+		return nil, err
+	}
+
+	if err := sqlTx.Commit(); err != nil {
+		return nil, err
+	}
 
 	return bc, nil
 }
 
-func (bc *Blockchain) AddBlock(newBlock *Block) {
-	bc.mu.Lock()
-	defer bc.mu.Unlock()
+func LoadBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
+	bc := &Blockchain{
+		Blocks:   make([]Block, 0),
+		Database: db,
+		Mempool:  mp,
+	}
 
-	bc.Blocks = append(bc.Blocks, *newBlock)
+	blocks, err := bc.GetAllBlocks()
+	if err != nil {
+		return nil, err
+	}
+
+	allBlocksValid, err := bc.VerifyBlocks(blocks)
+	if err != nil {
+		return nil, err
+	}
+
+	// If any block failed verification, clear database and start fresh
+	if !allBlocksValid {
+		return startFresh(db)
+	}
+
+	return bc, nil
+}
+
+func (bc *Blockchain) VerifyBlocks(blocks []Block) (bool, error) {
+	// database is empty
+	if len(blocks) == 0 {
+		return true, nil
+	}
+
+	for _, block := range blocks {
+		isVerified, err := bc.verifyBlock(&block)
+		if err != nil {
+			return false, err
+		}
+
+		if !isVerified {
+			return false, nil
+		}
+
+		bc.Blocks = append(bc.Blocks, block)
+	}
+
+	return true, nil
+}
+
+func startFresh(db *database.Database) (*Blockchain, error) {
+	log.Println("Found corrupted blockchain data, clearing database")
+
+	// ClearAllData -> Flush the database
+	if err := db.ClearAllData(); err != nil {
+		return nil, fmt.Errorf("ERROR clearing corrupted data: %v", err)
+	}
+
+	return &Blockchain{
+		Blocks:   make([]Block, 0),
+		Database: db,
+	}, nil
+}
+
+func (bc *Blockchain) AddBlock(sqlTx *sql.Tx, newBlock *Block) error {
+	bc.Mutex.Lock()
+	defer bc.Mutex.Unlock()
 
 	prevHashStr := hex.EncodeToString(newBlock.PrevHash)
 	hashStr := hex.EncodeToString(newBlock.Hash)
 
 	// Add block to database with block height
-	blockId, err := bc.Database.AddBlock(prevHashStr, hashStr, newBlock.Nonce,
-		newBlock.Timestamp, newBlock.Id)
+	blockId, err := bc.Database.AddBlock(sqlTx, prevHashStr, hashStr, newBlock.Nonce, newBlock.Timestamp,
+		newBlock.Id)
 
 	if err != nil {
-		log.Printf("ERROR adding block: %v\n", err)
-		return
+		return fmt.Errorf("ERROR adding block: %v\n", err)
 	}
 
-	// Add all transactions for this block
-	for _, tx := range newBlock.Transactions {
-		dbTx := database.DBTransactionSchema{
+	// AddTransactionToDB -> Add the blocks txs to the database
+	if err := bc.AddTransactionToDB(sqlTx, int(blockId), newBlock.Transactions); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (bc *Blockchain) AddTransactionToDB(dbTx *sql.Tx, blockId int, txs []Transaction) error {
+	for _, tx := range txs {
+		signatureStr := hex.EncodeToString(tx.Signature)
+
+		txInstance := database.DBTransactionSchema{
 			From:       tx.From,
 			To:         tx.To,
 			Amount:     tx.Amount,
 			Fee:        tx.Fee,
 			Timestamp:  tx.Timestamp,
 			PublicKey:  tx.PublicKey,
-			Signature:  tx.Signature,
+			Signature:  signatureStr,
 			Status:     "confirmed",
 			IsCoinbase: tx.IsCoinbase,
 		}
 
-		if err := bc.Database.AddTransaction(dbTx, int(blockId)); err != nil {
-			log.Printf("error adding transaction: %v\n", err)
+		if err := bc.Database.AddTransaction(dbTx, txInstance, blockId); err != nil {
+			return fmt.Errorf("ERROR adding transaction: %v\n", err)
 		}
 	}
 
+	return nil
 }
 
 func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
-	bc.mu.RLock()
-	defer bc.mu.RUnlock()
+	bc.Mutex.RLock()
+	defer bc.Mutex.RUnlock()
 
 	rows, err := bc.Database.GetAllBlocks()
 	if err != nil {
@@ -136,37 +169,19 @@ func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
 	}
 	defer rows.Close()
 
-	var blocks []Block
+	blocksCount, err := bc.Database.GetBlocksCount()
+	if err != nil {
+		return nil, err
+	}
+
+	blocks := make([]Block, 0, blocksCount)
 	for rows.Next() {
-		var block Block
-		var prevHashStr, hashStr string
-		var dbId int // database ID (index), not used for block identification
-
-		if err := rows.Scan(&dbId, &prevHashStr,
-			&hashStr, &block.Nonce, &block.Timestamp, &block.Id); err != nil {
-
-			return nil, err
-		}
-
-		block.PrevHash, err = hex.DecodeString(prevHashStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode 'prevHashStr': %v", err)
-		}
-
-		block.Hash, err = hex.DecodeString(hashStr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode 'hashStr': %v", err)
-		}
-
-		// Load transactions for this block using database ID
-		dbTransactions, err := bc.Database.GetTransactionsByBlockId(dbId)
+		block, err := bc.parseBlock(rows)
 		if err != nil {
 			return nil, err
 		}
 
-		block.parseDBTransactions(dbTransactions)
-
-		blocks = append(blocks, block)
+		blocks = append(blocks, *block)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -176,7 +191,44 @@ func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
 	return blocks, nil
 }
 
-func (bc *Blockchain) VerifyBlock(block *Block) (bool, error) {
+func (bc *Blockchain) parseBlock(rows *sql.Rows) (*Block, error) {
+	var block Block
+
+	var prevHashStr, hashStr string
+	var dbId int // database ID (index), not used for block identification
+
+	if err := rows.Scan(&dbId, &prevHashStr,
+		&hashStr, &block.Nonce, &block.Timestamp, &block.Id); err != nil {
+
+		return nil, err
+	}
+
+	var err error
+
+	block.PrevHash, err = hex.DecodeString(prevHashStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode 'prevHashStr': %v", err)
+	}
+
+	block.Hash, err = hex.DecodeString(hashStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode 'hashStr': %v", err)
+	}
+
+	// Load transactions for this block using database ID
+	dbTransactions, err := bc.Database.GetTransactionsByBlockId(dbId)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := block.parseDBTransactions(dbTransactions); err != nil {
+		return nil, err
+	}
+
+	return &block, nil
+}
+
+func (bc *Blockchain) verifyBlock(block *Block) (bool, error) {
 	tempBlock := &Block{
 		Id:           block.Id,
 		PrevHash:     block.PrevHash,
@@ -207,7 +259,11 @@ func (bc *Blockchain) GetBalance(address string) (uint64, error) {
 		return 0, err
 	}
 
+	log.Println("Confirmed Balance: ", confirmedBalance)
+
 	pendingOutgoing := getUserPendingOutgoing(address, mempoolTxs)
+
+	log.Println("Pending outgoing: ", pendingOutgoing)
 
 	if confirmedBalance < pendingOutgoing {
 		return 0, nil
@@ -215,17 +271,12 @@ func (bc *Blockchain) GetBalance(address string) (uint64, error) {
 
 	effectiveBalance := confirmedBalance - pendingOutgoing
 
+	log.Println("Effective balance: ", effectiveBalance)
+
 	return effectiveBalance, nil
 }
 
-func (bc *Blockchain) updateUserBalances(txs []Transaction) error {
-	sqlTx, err := bc.Database.Begin()
-	if err != nil {
-		return err
-	}
-
-	defer sqlTx.Rollback()
-
+func (bc *Blockchain) updateUserBalances(sqlTx *sql.Tx, txs []Transaction) error {
 	// Calculate total fees from all transactions in this block
 	var totalFees uint64
 
@@ -259,7 +310,7 @@ func (bc *Blockchain) updateUserBalances(txs []Transaction) error {
 		}
 	}
 
-	return sqlTx.Commit()
+	return nil
 }
 
 func (bc *Blockchain) ValidateTransaction(tx *Transaction) error {

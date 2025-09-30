@@ -15,16 +15,21 @@ func newRouter(handler *handler.Handler) *Router {
 
 	router.Route("/api", func(r chi.Router) {
 		r.Get("/chain", handler.GetBlockchain)
-		r.Post("/add/tx", handler.AddTransaction)
 		r.Post("/mine", handler.MineBlock)
 
 		r.Get("/balance", handler.GetBalance)
 		r.Get("/blocks", handler.GetAllBlocks)
 
 		r.Get("/txs", handler.GetTransactions)
+		r.Post("/tx/send", handler.SendTransaction)
 		r.Get("/tx/fee", handler.GetCurrentTxFee)
 
 		r.Post("/keys", handler.GenerateKeys)
+
+		r.Delete("/clear", handler.ClearDatabase)
+
+		r.Post("/node/join-network", handler.NodeJoinNetwork)
+		r.Get("/node/peers", handler.GetPeers)
 	})
 
 	return &Router{

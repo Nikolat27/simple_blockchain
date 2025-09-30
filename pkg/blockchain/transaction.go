@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"simple_blockchain/pkg/crypto"
+	"time"
 )
 
 const CoinbaseTxFee = 0
@@ -12,10 +13,10 @@ type Transaction struct {
 	From       string `json:"from,omitempty"`
 	To         string `json:"to"`
 	Amount     uint64 `json:"amount"`
-	Timestamp  int64
+	Timestamp  int64  `json:"timestamp"`
 	PublicKey  string // sender's public key (hex string)
 	Signature  []byte // Ed25519 signature
-	Fee        uint64
+	Fee        uint64 `json:"fee"`
 	Status     string `json:"status"`
 	IsCoinbase bool   `json:"is_coinbase"`
 }
@@ -64,6 +65,7 @@ func createCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
 		To:         minerAddress,
 		Amount:     miningReward,
 		Fee:        CoinbaseTxFee,
+		Timestamp:  time.Now().Unix(),
 		Status:     "confirmed",
 		IsCoinbase: true,
 	}

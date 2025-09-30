@@ -30,28 +30,28 @@ func New(driverName, dataSourceName string) (*Database, error) {
 	}, nil
 }
 
-func (sqlite *Database) Close() error {
-	return sqlite.db.Close()
+func (db *Database) Close() error {
+	return db.db.Close()
 }
 
-func (sqlite *Database) Version() (string, error) {
+func (db *Database) Version() (string, error) {
 	var version string
 
-	if err := sqlite.db.QueryRow("SELECT sqlite_version()").Scan(&version); err != nil {
+	if err := db.db.QueryRow("SELECT sqlite_version()").Scan(&version); err != nil {
 		return "", err
 	}
 
 	return version, nil
 }
 
-// Begin -> For isolation level
-func (sqlite *Database) Begin() (*sql.Tx, error) {
-	return sqlite.db.Begin()
+// BeginTx -> For isolation level
+func (db *Database) BeginTx() (*sql.Tx, error) {
+	return db.db.Begin()
 }
 
 // ClearAllData removes all blockchain data (used when corruption is detected)
-func (sqlite *Database) ClearAllData() error {
-	tx, err := sqlite.Begin()
+func (db *Database) ClearAllData() error {
+	tx, err := db.BeginTx()
 	if err != nil {
 		return err
 	}

@@ -1,18 +1,26 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"os"
 	"simple_blockchain/pkg/HttpServer"
 	"simple_blockchain/pkg/blockchain"
 	"simple_blockchain/pkg/database"
 	"simple_blockchain/pkg/handler"
+	"simple_blockchain/pkg/p2p"
 	"simple_blockchain/pkg/utils"
 )
 
-const Port = "8000"
-
 func main() {
+	httpPort := flag.String("port", "8000", "http port")
+	tcpPort := flag.String("node-port", "8080", "tcp port")
+
+	flag.Parse()
+
+	peerAddress := fmt.Sprintf(":%s", *tcpPort)
+
 	if err := utils.LoadEnv(); err != nil {
 		panic(err)
 	}
@@ -42,10 +50,15 @@ func main() {
 		}
 	}
 
-	// http handlers
-	newHandler := handler.New(bc)
+	newNode, err := p2p.NewNode(peerAddress, bc)
+	if err != nil {
+		panic(err)
+	}
 
-	httpServer := HttpServer.New(Port, newHandler)
+	// http handlers
+	newHandler := handler.New(newNode)
+
+	httpServer := HttpServer.New(*httpPort, newHandler)
 
 	if err := httpServer.Run(); err != nil {
 		log.Fatal(err)

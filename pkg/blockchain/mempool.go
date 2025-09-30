@@ -6,7 +6,7 @@ import (
 )
 
 type Mempool struct {
-	transactions []Transaction
+	Transactions []Transaction `json:"transactions"`
 	Mutex        sync.RWMutex
 }
 
@@ -15,7 +15,7 @@ const HighTxFee = 200 // 2%
 
 func NewMempool() *Mempool {
 	return &Mempool{
-		transactions: make([]Transaction, 0),
+		Transactions: make([]Transaction, 0),
 	}
 }
 
@@ -23,7 +23,7 @@ func (mp *Mempool) AddTransaction(tx *Transaction) {
 	mp.Mutex.Lock()
 	defer mp.Mutex.Unlock()
 
-	mp.transactions = append(mp.transactions, *tx)
+	mp.Transactions = append(mp.Transactions, *tx)
 }
 
 func (mp *Mempool) GetTransactions() []Transaction {
@@ -31,14 +31,14 @@ func (mp *Mempool) GetTransactions() []Transaction {
 	defer mp.Mutex.RUnlock()
 
 	// Return a copy to prevent external modification
-	transactions := make([]Transaction, len(mp.transactions))
-	copy(transactions, mp.transactions)
+	transactions := make([]Transaction, len(mp.Transactions))
+	copy(transactions, mp.Transactions)
 
 	return transactions
 }
 
 // SortTxsByFee -> sort transactions in DESC order by their fee
-func SortTxsByFee(txs *[]Transaction) {
+func (mp *Mempool) SortTxsByFee(txs *[]Transaction) {
 	sort.Slice(*txs, func(i, j int) bool {
 		return (*txs)[i].Fee > (*txs)[j].Fee
 	})
@@ -48,14 +48,14 @@ func (mp *Mempool) Clear() {
 	mp.Mutex.Lock()
 	defer mp.Mutex.Unlock()
 
-	mp.transactions = []Transaction{}
+	mp.Transactions = []Transaction{}
 }
 
 func (mp *Mempool) CalculateTxFee() uint64 {
-	mp.Mutex.Lock()
-	defer mp.Mutex.Unlock()
+	mp.Mutex.RLock()
+	defer mp.Mutex.RUnlock()
 
-	if len(mp.transactions) > 100 {
+	if len(mp.Transactions) > 100 {
 		return HighTxFee
 	}
 
@@ -72,16 +72,4 @@ func (mp *Mempool) CalculateFee(amount uint64) uint64 {
 	}
 
 	return feeAmount
-}
-
-func (mp *Mempool) CalculateFinalAmount(amount uint64) uint64 {
-	txFee := mp.CalculateTxFee()
-
-	finalTxFee := (amount * txFee) / 10000 // 100%
-
-	if finalTxFee == 0 {
-		finalTxFee = 1
-	}
-
-	return amount - finalTxFee
 }

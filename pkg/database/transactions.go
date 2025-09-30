@@ -12,20 +12,20 @@ type DBTransactionSchema struct {
 	Fee        uint64
 	Timestamp  int64
 	PublicKey  string
-	Signature  []byte
+	Signature  string
 	Status     string
 	IsCoinbase bool
 }
 
-func (sqlite *Database) GetTransactionsByBlockId(blockId int) ([]DBTransactionSchema, error) {
+func (db *Database) GetTransactionsByBlockId(blockId int) ([]DBTransactionSchema, error) {
 	query := `
-		SELECT sender, recipient, amount, fee, timestamp, public_key, signature, status, is_coin_base
-		FROM transactions
-		WHERE block_id = ?
-		ORDER BY id ASC
-	`
+			SELECT sender, recipient, amount, fee, timestamp, public_key, signature, status, is_coin_base
+			FROM transactions
+			WHERE block_id = ?
+			ORDER BY id
+		`
 
-	rows, err := sqlite.db.Query(query, blockId)
+	rows, err := db.db.Query(query, blockId)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (sqlite *Database) GetTransactionsByBlockId(blockId int) ([]DBTransactionSc
 			tx.PublicKey = publicKey.String
 		}
 		if signature.Valid {
-			tx.Signature = []byte(signature.String)
+			tx.Signature = signature.String
 		}
 
 		transactions = append(transactions, tx)
@@ -64,28 +64,28 @@ func (sqlite *Database) GetTransactionsByBlockId(blockId int) ([]DBTransactionSc
 	return transactions, nil
 }
 
-func (sqlite *Database) AddTransaction(tx DBTransactionSchema, blockId int) error {
+func (db *Database) AddTransaction(sqlTx *sql.Tx, tx DBTransactionSchema, blockId int) error {
 	query := `
 		INSERT INTO transactions(block_id, sender, recipient, amount, fee, timestamp, public_key, signature, status, is_coin_base)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	var sender interface{} = nil
+	var sender any = nil
 	if tx.From != "" {
 		sender = tx.From
 	}
 
-	var publicKey interface{} = nil
+	var publicKey any = nil
 	if tx.PublicKey != "" {
 		publicKey = tx.PublicKey
 	}
 
-	var signature interface{} = nil
+	var signature any = nil
 	if len(tx.Signature) > 0 {
-		signature = string(tx.Signature)
+		signature = tx.Signature
 	}
 
-	_, err := sqlite.db.Exec(query, blockId, sender, tx.To, tx.Amount, tx.Fee, tx.Timestamp,
+	_, err := sqlTx.Exec(query, blockId, sender, tx.To, tx.Amount, tx.Fee, tx.Timestamp,
 		publicKey, signature, tx.Status, tx.IsCoinbase)
 
 	return err

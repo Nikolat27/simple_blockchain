@@ -3,10 +3,10 @@ package blockchain
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"simple_blockchain/pkg/database"
 	"strings"
+	"time"
 )
 
 type Block struct {
@@ -21,14 +21,10 @@ type Block struct {
 func (block *Block) HashBlock() error {
 	prevHashStr := hex.EncodeToString(block.PrevHash)
 
-	// Create a deterministic string representation of transactions
-	txData, err := json.Marshal(block.Transactions)
-	if err != nil {
-		return err
-	}
+	txData := block.SerializeTransactions()
 
 	record := fmt.Sprintf("%d-%s-%d-%d-%s", block.Id, prevHashStr,
-		block.Timestamp, block.Nonce, string(txData))
+		block.Timestamp, block.Nonce, txData)
 
 	hash := sha256.Sum256([]byte(record))
 
@@ -44,10 +40,15 @@ func (block *Block) IsValidHash() bool {
 }
 
 // parseDBTransactions -> Convert DB transactions to blockchain transactions
-func (block *Block) parseDBTransactions(dbTxs []database.DBTransactionSchema) {
-	block.Transactions = make([]Transaction, len(dbTxs))
+func (block *Block) parseDBTransactions(dbTxs []database.DBTransactionSchema) error {
+	block.Transactions = make([]Transaction, len(dbTxs), len(dbTxs))
 
 	for idx, dbTx := range dbTxs {
+		decodedSignature, err := hex.DecodeString(dbTx.Signature)
+		if err != nil {
+			return err
+		}
+
 		block.Transactions[idx] = Transaction{
 			From:       dbTx.From,
 			To:         dbTx.To,
@@ -55,18 +56,34 @@ func (block *Block) parseDBTransactions(dbTxs []database.DBTransactionSchema) {
 			Fee:        dbTx.Fee,
 			Timestamp:  dbTx.Timestamp,
 			PublicKey:  dbTx.PublicKey,
-			Signature:  dbTx.Signature,
+			Signature:  decodedSignature,
 			Status:     dbTx.Status,
 			IsCoinbase: dbTx.IsCoinbase,
 		}
 	}
+
+	return nil
+}
+
+// SerializeTransactions -> Deterministic
+func (block *Block) SerializeTransactions() string {
+	txs := block.Transactions
+
+	parts := make([]string, len(txs))
+
+	for i, tx := range txs {
+		parts[i] = fmt.Sprintf("%s-%s-%d-%x",
+			tx.From, tx.To, tx.Amount, tx.Signature)
+	}
+
+	return strings.Join(parts, "|")
 }
 
 func createGenesisBlock() (*Block, error) {
 	block := &Block{
 		Id:           0,
 		PrevHash:     make([]byte, 32),
-		Timestamp:    1609459200, // Fixed timestamp: 2021-01-01 00:00:00 UTC
+		Timestamp:    time.Now().Unix(),
 		Transactions: []Transaction{},
 		Nonce:        0,
 	}
