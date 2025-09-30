@@ -3,7 +3,7 @@ package handler
 import (
 	"net/http"
 	"simple_blockchain/pkg/blockchain"
-	"simple_blockchain/pkg/crypto"
+	"simple_blockchain/pkg/CryptoGraphy"
 	"simple_blockchain/pkg/utils"
 	"time"
 )
@@ -40,7 +40,7 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Validate that the 'from' address matches the public key
-	derivedAddress, err := crypto.DeriveAddressFromPublicKey(input.PublicKey)
+	derivedAddress, err := CryptoGraphy.DeriveAddressFromPublicKey(input.PublicKey)
 	if err != nil {
 		utils.WriteJSON(w, http.StatusBadRequest, "Invalid public key format")
 		return

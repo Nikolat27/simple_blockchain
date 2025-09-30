@@ -3,7 +3,7 @@ package blockchain
 import (
 	"crypto/sha256"
 	"encoding/json"
-	"simple_blockchain/pkg/crypto"
+	"simple_blockchain/pkg/CryptoGraphy"
 	"time"
 )
 
@@ -32,7 +32,7 @@ func (tx *Transaction) hash() []byte {
 	return hash[:]
 }
 
-func (tx *Transaction) Sign(keyPair *crypto.KeyPair) error {
+func (tx *Transaction) Sign(keyPair *CryptoGraphy.KeyPair) error {
 	tx.PublicKey = keyPair.GetPublicKeyHex() // Set PublicKey BEFORE hashing
 	hash := tx.hash()
 	tx.Signature = keyPair.Sign(hash)
@@ -40,7 +40,7 @@ func (tx *Transaction) Sign(keyPair *crypto.KeyPair) error {
 }
 
 func (tx *Transaction) SignWithHexKeys(privateKeyHex, publicKeyHex string) error {
-	keyPair, err := crypto.LoadKeyPairFromHex(privateKeyHex, publicKeyHex)
+	keyPair, err := CryptoGraphy.LoadKeyPairFromHex(privateKeyHex, publicKeyHex)
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func (tx *Transaction) Verify() bool {
 	}
 
 	hash := tx.hash()
-	return crypto.VerifySignature(tx.PublicKey, hash, tx.Signature)
+	return CryptoGraphy.VerifySignature(tx.PublicKey, hash, tx.Signature)
 }
 
 func createCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
