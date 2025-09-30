@@ -29,11 +29,43 @@ func (handler *Handler) NodeJoinNetwork(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Waits for blockchain data from the node`s channel
+	blocks := <-handler.Node.BlockchainRespCh
+
+	valid, err := handler.Node.Blockchain.VerifyBlocks(blocks)
+	if err != nil {
+		utils.WriteJSON(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if !valid {
+		utils.WriteJSON(w, http.StatusBadRequest, "received blockchain is corrupted")
+		return
+	}
+
+	handler.Node.AddNewPeer(input.TcpAddress)
+
 	utils.WriteJSON(w, http.StatusAccepted, "Blockchain verified successfully!")
 }
 
 func (handler *Handler) GetPeers(w http.ResponseWriter, r *http.Request) {
-	allPeers := handler.Node.Peers
+	rows, err := handler.Node.Blockchain.Database.GetPeers()
+	if err != nil {
+		utils.WriteJSON(w, http.StatusInternalServerError, err)
+		return
+	}
+	defer rows.Close()
 
-	utils.WriteJSON(w, http.StatusOK, allPeers)
+	var peers []string
+	for rows.Next() {
+		var peer string
+		if err := rows.Scan(&peer); err != nil {
+			utils.WriteJSON(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		peers = append(peers, peer)
+	}
+
+	utils.WriteJSON(w, http.StatusOK, peers)
 }

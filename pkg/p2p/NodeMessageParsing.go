@@ -28,7 +28,7 @@ func (node *Node) parseMessage(senderMsg []byte) error {
 
 		// Sending the blockchain`s data to the applicant
 	case GetBlockchainDataMsg:
-		node.blockchainRespCh <- msg.Blocks
+		node.BlockchainRespCh <- msg.Blocks
 
 	default:
 		fmt.Println("meow meow")

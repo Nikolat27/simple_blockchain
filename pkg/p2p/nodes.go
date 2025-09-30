@@ -14,7 +14,7 @@ type Node struct {
 
 	Blockchain *blockchain.Blockchain `json:"blockchain"`
 
-	blockchainRespCh chan []blockchain.Block // communication channel
+	BlockchainRespCh chan []blockchain.Block // communication channel
 }
 
 func NewNode(address string, bc *blockchain.Blockchain) (*Node, error) {
@@ -31,7 +31,7 @@ func NewNode(address string, bc *blockchain.Blockchain) (*Node, error) {
 
 		Blockchain: bc,
 
-		blockchainRespCh: make(chan []blockchain.Block),
+		BlockchainRespCh: make(chan []blockchain.Block),
 	}
 
 	go node.startListening(tcpListener)

@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 )
@@ -14,20 +13,6 @@ func (node *Node) handleNodeJoinNetwork(requestorAddr string) error {
 	if err := node.Write(requestorAddr, getBlockchainMsg.Marshal()); err != nil {
 		return err
 	}
-
-	// Waits for blockchain data from the node`s channel
-	blocks := <-node.blockchainRespCh
-
-	valid, err := node.Blockchain.VerifyBlocks(blocks)
-	if err != nil {
-		return err
-	}
-
-	if !valid {
-		return errors.New("received blockchain is corrupted")
-	}
-
-	node.AddNewPeer(requestorAddr)
 
 	fmt.Printf("Node: %s verified Node: %s\n", node.GetCurrentAddress(), requestorAddr)
 	return nil
