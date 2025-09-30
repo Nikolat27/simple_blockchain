@@ -1,0 +1,8 @@
+=============== Sep 30, 2025 (+0330) ===============
+12:05:21.530364 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+12:05:21.532684 db@open opening
+12:05:21.532850 version@stat F·[] S·0B[] Sc·[]
+12:05:21.533248 db@janitor F·2 G·0
+12:05:21.533258 db@open done T·562.343µs
+12:05:21.533473 db@close closing
+12:05:21.533498 db@close done T·21.623µs

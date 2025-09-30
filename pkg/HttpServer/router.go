@@ -22,6 +22,8 @@ func newRouter(handler *handler.Handler) *Router {
 		r.Get("/transactions", handler.GetTransactions)
 
 		r.Post("/keys", handler.GenerateKeys)
+
+		r.Post("/node/register", handler.RegisterNode)
 	})
 
 	return &Router{
