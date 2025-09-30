@@ -10,7 +10,7 @@ func (node *Node) handleNodeJoinNetwork(requestorAddr string) error {
 	getBlockchainMsg := NewMessage(SendBlockchainDataMsg, node.GetCurrentAddress(), nil)
 
 	// Request blockchain data
-	if err := node.Write(requestorAddr, getBlockchainMsg.Marshal()); err != nil {
+	if err := node.WriteMessage(requestorAddr, getBlockchainMsg.Marshal()); err != nil {
 		return err
 	}
 
@@ -26,11 +26,25 @@ func (node *Node) handleGetBlockchainData(requestorAddr string) error {
 
 	msg := NewMessage(GetBlockchainDataMsg, node.GetCurrentAddress(), blocks)
 
-	return node.Write(requestorAddr, msg.Marshal())
+	return node.WriteMessage(requestorAddr, msg.Marshal())
 }
 
-func (node *Node) AddNewPeer(newPeerAddress string) {
-	if !slices.Contains(node.Peers, newPeerAddress) {
-		node.Peers = append(node.Peers, newPeerAddress)
+func (node *Node) AddNewPeer(newPeerAddress string) error {
+	if slices.Contains(node.Peers, newPeerAddress) {
+		return nil
 	}
+
+	sqlTx, err := node.Blockchain.Database.BeginTx()
+	if err != nil {
+		return err
+	}
+	defer sqlTx.Rollback()
+
+	node.Peers = append(node.Peers, newPeerAddress)
+
+	if err := node.Blockchain.Database.AddPeer(sqlTx, newPeerAddress); err != nil {
+		return err
+	}
+
+	return sqlTx.Commit()
 }
