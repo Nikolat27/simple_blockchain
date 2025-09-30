@@ -19,7 +19,7 @@ type Blockchain struct {
 	Mutex  sync.RWMutex
 
 	Database *database.Database
-	Mempool  *Mempool
+	Mempool  *Mempool `json:"mempool"`
 }
 
 func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
@@ -63,7 +63,7 @@ func LoadBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
 		return nil, err
 	}
 
-	allBlocksValid, err := bc.verifyBlocks(blocks)
+	allBlocksValid, err := bc.VerifyBlocks(blocks)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func LoadBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
 	return bc, nil
 }
 
-func (bc *Blockchain) verifyBlocks(blocks []Block) (bool, error) {
+func (bc *Blockchain) VerifyBlocks(blocks []Block) (bool, error) {
 	// database is empty
 	if len(blocks) == 0 {
 		return true, nil
