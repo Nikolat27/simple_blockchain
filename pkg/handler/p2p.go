@@ -21,10 +21,21 @@ func (handler *Handler) NodeJoinNetwork(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	exist, err := handler.Node.Blockchain.Database.PeerExist(input.TcpAddress)
+	if err != nil {
+		utils.WriteJSON(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if exist {
+		utils.WriteJSON(w, http.StatusBadRequest, "peer with this TCP address exists already")
+		return
+	}
+
 	senderMsg := p2p.NewMessage(p2p.JoinNetworkMsg, input.TcpAddress, nil)
 
 	// sends a 'join network' message
-	if err := handler.Node.Write(handler.Node.GetCurrentAddress(), senderMsg.Marshal()); err != nil {
+	if err := handler.Node.WriteMessage(handler.Node.GetCurrentAddress(), senderMsg.Marshal()); err != nil {
 		utils.WriteJSON(w, http.StatusInternalServerError, err)
 		return
 	}
@@ -43,7 +54,10 @@ func (handler *Handler) NodeJoinNetwork(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	handler.Node.AddNewPeer(input.TcpAddress)
+	if err := handler.Node.AddNewPeer(input.TcpAddress); err != nil {
+		utils.WriteJSON(w, http.StatusBadRequest, err)
+		return
+	}
 
 	utils.WriteJSON(w, http.StatusAccepted, "Blockchain verified successfully!")
 }
