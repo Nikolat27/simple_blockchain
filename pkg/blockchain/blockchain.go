@@ -2,68 +2,235 @@ package blockchain
 
 import (
 	"bytes"
+	"database/sql"
+	"encoding/hex"
+	"errors"
 	"fmt"
-	"simple_blockchain/pkg/LevelDB"
+	"log"
 	"simple_blockchain/pkg/database"
 	"sync"
 )
 
-const MiningReward = 5
+const MiningReward = 10000
 const Difficulty = 5
 
 type Blockchain struct {
 	Blocks []Block `json:"blocks"`
-	mu     sync.RWMutex
+	Mutex  sync.RWMutex
 
 	Database *database.Database
-	LevelDB  *LevelDB.LevelDB
+	Mempool  *Mempool
 }
 
-func NewBlockchain(genesisAddress string, levelDB *LevelDB.LevelDB, sqlite *database.Database) *Blockchain {
+func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
 	bc := &Blockchain{
 		Blocks:   make([]Block, 0),
-		LevelDB:  levelDB,
-		Database: sqlite,
+		Database: db,
+		Mempool:  mp,
 	}
 
-	genesisTx := &Transaction{
-		To:         genesisAddress,
-		Amount:     1000,
-		Status:     "confirmed",
-		IsCoinbase: true,
+	genesisBlock, err := createGenesisBlock()
+	if err != nil {
+		return nil, err
 	}
 
-	genesisBlock := createGenesisBlock(genesisTx)
+	sqlTx, err := db.BeginTx()
+	if err != nil {
+		return nil, err
+	}
+	defer sqlTx.Rollback()
 
-	bc.Blocks = append(bc.Blocks, *genesisBlock)
-
-	if err := bc.Database.IncreaseUserBalance(genesisAddress, genesisTx.Amount); err != nil {
-		panic(fmt.Sprintf("failed to apply genesis balance: %v", err))
+	if err := bc.AddBlock(sqlTx, genesisBlock); err != nil {
+		return nil, err
 	}
 
-	return bc
+	if err := sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return bc, nil
 }
 
-func (bc *Blockchain) AddBlock(newBlock *Block) {
-	bc.mu.Lock()
-	defer bc.mu.Unlock()
+func LoadBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
+	bc := &Blockchain{
+		Blocks:   make([]Block, 0),
+		Database: db,
+		Mempool:  mp,
+	}
 
-	bc.Blocks = append(bc.Blocks, *newBlock)
+	blocks, err := bc.GetAllBlocks()
+	if err != nil {
+		return nil, err
+	}
+
+	allBlocksValid, err := bc.verifyBlocks(blocks)
+	if err != nil {
+		return nil, err
+	}
+
+	// If any block failed verification, clear database and start fresh
+	if !allBlocksValid {
+		return startFresh(db)
+	}
+
+	return bc, nil
 }
 
-func (bc *Blockchain) GetBlocks() []Block {
-	bc.mu.RLock()
-	defer bc.mu.RUnlock()
+func (bc *Blockchain) verifyBlocks(blocks []Block) (bool, error) {
+	// database is empty
+	if len(blocks) == 0 {
+		return true, nil
+	}
 
-	blocksCopy := make([]Block, len(bc.Blocks))
-	copy(blocksCopy, bc.Blocks)
+	for _, block := range blocks {
+		isVerified, err := bc.verifyBlock(&block)
+		if err != nil {
+			return false, err
+		}
 
-	return blocksCopy
+		if !isVerified {
+			return false, nil
+		}
+
+		bc.Blocks = append(bc.Blocks, block)
+	}
+
+	return true, nil
 }
 
-func (bc *Blockchain) VerifyBlock(block *Block) bool {
+func startFresh(db *database.Database) (*Blockchain, error) {
+	log.Println("Found corrupted blockchain data, clearing database")
+
+	// ClearAllData -> Flush the database
+	if err := db.ClearAllData(); err != nil {
+		return nil, fmt.Errorf("ERROR clearing corrupted data: %v", err)
+	}
+
+	return &Blockchain{
+		Blocks:   make([]Block, 0),
+		Database: db,
+	}, nil
+}
+
+func (bc *Blockchain) AddBlock(sqlTx *sql.Tx, newBlock *Block) error {
+	bc.Mutex.Lock()
+	defer bc.Mutex.Unlock()
+
+	prevHashStr := hex.EncodeToString(newBlock.PrevHash)
+	hashStr := hex.EncodeToString(newBlock.Hash)
+
+	// Add block to database with block height
+	blockId, err := bc.Database.AddBlock(sqlTx, prevHashStr, hashStr, newBlock.Nonce, newBlock.Timestamp,
+		newBlock.Id)
+
+	if err != nil {
+		return fmt.Errorf("ERROR adding block: %v\n", err)
+	}
+
+	// AddTransactionToDB -> Add the blocks txs to the database
+	if err := bc.AddTransactionToDB(sqlTx, int(blockId), newBlock.Transactions); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (bc *Blockchain) AddTransactionToDB(dbTx *sql.Tx, blockId int, txs []Transaction) error {
+	for _, tx := range txs {
+		signatureStr := hex.EncodeToString(tx.Signature)
+
+		txInstance := database.DBTransactionSchema{
+			From:       tx.From,
+			To:         tx.To,
+			Amount:     tx.Amount,
+			Fee:        tx.Fee,
+			Timestamp:  tx.Timestamp,
+			PublicKey:  tx.PublicKey,
+			Signature:  signatureStr,
+			Status:     "confirmed",
+			IsCoinbase: tx.IsCoinbase,
+		}
+
+		if err := bc.Database.AddTransaction(dbTx, txInstance, blockId); err != nil {
+			return fmt.Errorf("ERROR adding transaction: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
+func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
+	bc.Mutex.RLock()
+	defer bc.Mutex.RUnlock()
+
+	rows, err := bc.Database.GetAllBlocks()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	blocksCount, err := bc.Database.GetBlocksCount()
+	if err != nil {
+		return nil, err
+	}
+
+	blocks := make([]Block, 0, blocksCount)
+	for rows.Next() {
+		block, err := bc.parseBlock(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		blocks = append(blocks, *block)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return blocks, nil
+}
+
+func (bc *Blockchain) parseBlock(rows *sql.Rows) (*Block, error) {
+	var block Block
+
+	var prevHashStr, hashStr string
+	var dbId int // database ID (index), not used for block identification
+
+	if err := rows.Scan(&dbId, &prevHashStr,
+		&hashStr, &block.Nonce, &block.Timestamp, &block.Id); err != nil {
+
+		return nil, err
+	}
+
+	var err error
+
+	block.PrevHash, err = hex.DecodeString(prevHashStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode 'prevHashStr': %v", err)
+	}
+
+	block.Hash, err = hex.DecodeString(hashStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode 'hashStr': %v", err)
+	}
+
+	// Load transactions for this block using database ID
+	dbTransactions, err := bc.Database.GetTransactionsByBlockId(dbId)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := block.parseDBTransactions(dbTransactions); err != nil {
+		return nil, err
+	}
+
+	return &block, nil
+}
+
+func (bc *Blockchain) verifyBlock(block *Block) (bool, error) {
 	tempBlock := &Block{
-		Index:        block.Index,
+		Id:           block.Id,
 		PrevHash:     block.PrevHash,
 		Timestamp:    block.Timestamp,
 		Transactions: block.Transactions,
@@ -71,43 +238,115 @@ func (bc *Blockchain) VerifyBlock(block *Block) bool {
 		Hash:         nil,
 	}
 
-	tempBlock.HashBlock()
+	if err := tempBlock.HashBlock(); err != nil {
+		return false, err
+	}
 
 	hashMatches := bytes.Equal(tempBlock.Hash, block.Hash)
 
-	return hashMatches && tempBlock.IsValidHash()
+	if hashMatches && isGenesisBlock(tempBlock.Id) {
+		return true, nil
+	}
+
+	return hashMatches && tempBlock.IsValidHash(), nil
 }
 
 func (bc *Blockchain) GetBalance(address string) (uint64, error) {
-	return bc.Database.GetBalance(address)
+	mempoolTxs := bc.Mempool.GetTransactions()
+
+	confirmedBalance, err := bc.Database.GetConfirmedBalance(address)
+	if err != nil {
+		return 0, err
+	}
+
+	log.Println("Confirmed Balance: ", confirmedBalance)
+
+	pendingOutgoing := getUserPendingOutgoing(address, mempoolTxs)
+
+	log.Println("Pending outgoing: ", pendingOutgoing)
+
+	if confirmedBalance < pendingOutgoing {
+		return 0, nil
+	}
+
+	effectiveBalance := confirmedBalance - pendingOutgoing
+
+	log.Println("Effective balance: ", effectiveBalance)
+
+	return effectiveBalance, nil
 }
 
-func (bc *Blockchain) updateUserBalances(txs []Transaction) error {
-	sqlTx, err := bc.Database.DB.Begin()
+func (bc *Blockchain) updateUserBalances(sqlTx *sql.Tx, txs []Transaction) error {
+	// Calculate total fees from all transactions in this block
+	var totalFees uint64
+
+	for _, tx := range txs {
+		if !tx.IsCoinbase {
+			totalFees += tx.Fee
+		}
+	}
+
+	for _, tx := range txs {
+		if tx.IsCoinbase {
+			// Credit miner with mining reward + total fees from this block
+			minerReward := tx.Amount + totalFees
+			if err := bc.Database.IncreaseUserBalance(sqlTx, tx.To, minerReward); err != nil {
+				return fmt.Errorf("failed to credit miner %s: %w", tx.To, err)
+			}
+			continue
+		}
+
+		// For regular transactions: sender pays amount + fee
+		totalDebit := tx.Amount + tx.Fee
+		if err := bc.Database.DecreaseUserBalance(sqlTx, tx.From, totalDebit); err != nil {
+			return fmt.Errorf("failed to debit sender %s: %w", tx.From, err)
+		}
+
+		// Credit receiver with the transaction amount
+		if tx.To != "" {
+			if err := bc.Database.IncreaseUserBalance(sqlTx, tx.To, tx.Amount); err != nil {
+				return fmt.Errorf("failed to credit receiver %s: %w", tx.To, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (bc *Blockchain) ValidateTransaction(tx *Transaction) error {
+	if tx.IsCoinbase {
+		return nil
+	}
+
+	balance, err := bc.GetBalance(tx.From)
 	if err != nil {
 		return err
 	}
 
-	defer sqlTx.Rollback()
+	totalCost := tx.Amount + tx.Fee
+	if balance >= totalCost {
+		return nil
+	}
 
-	for _, tx := range txs {
+	return errors.New("balance is insufficient")
+}
 
+func getUserPendingOutgoing(address string, mempoolTxs []Transaction) uint64 {
+	var pending uint64
+
+	for _, tx := range mempoolTxs {
 		if tx.IsCoinbase {
-			if err := bc.Database.IncreaseUserBalance(tx.To, tx.Amount); err != nil {
-				return fmt.Errorf("failed to credit miner %s: %w", tx.To, err)
-			}
-
 			continue
 		}
 
-		if err := bc.Database.DecreaseUserBalance(tx.From, tx.Amount); err != nil {
-			return fmt.Errorf("failed to debit sender %s: %w", tx.From, err)
-		}
-
-		if err := bc.Database.IncreaseUserBalance(tx.To, tx.Amount); err != nil {
-			return fmt.Errorf("failed to credit receiver %s: %w", tx.From, err)
+		if tx.From == address {
+			pending += tx.Amount + tx.Fee // Include both amount and fee
 		}
 	}
 
-	return sqlTx.Commit()
+	return pending
+}
+
+func isGenesisBlock(id int64) bool {
+	return id == 0
 }

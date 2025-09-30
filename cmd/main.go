@@ -2,35 +2,48 @@ package main
 
 import (
 	"log"
+	"os"
 	"simple_blockchain/pkg/HttpServer"
-	"simple_blockchain/pkg/LevelDB"
 	"simple_blockchain/pkg/blockchain"
 	"simple_blockchain/pkg/database"
 	"simple_blockchain/pkg/handler"
+	"simple_blockchain/pkg/utils"
 )
 
 const Port = "8000"
 
 func main() {
-	sqliteDBInstance, err := database.New("sqlite3", "./blockchain_db.sqlite2")
+	if err := utils.LoadEnv(); err != nil {
+		panic(err)
+	}
+
+	dbDriverName := os.Getenv("DB_DRIVER_NAME")
+	dataSourceName := os.Getenv("DATA_SOURCE_NAME")
+
+	dbInstance, err := database.New(dbDriverName, dataSourceName)
 	if err != nil {
 		panic(err)
 	}
-	defer sqliteDBInstance.Close()
+	defer dbInstance.Close()
 
-	levelDBInstance, err := LevelDB.New("balances")
+	mempool := blockchain.NewMempool()
+
+	// Try to load existing blockchain
+	bc, err := blockchain.LoadBlockchain(dbInstance, mempool)
 	if err != nil {
 		panic(err)
 	}
-	defer levelDBInstance.Close()
 
-	var newBc *blockchain.Blockchain
-	var newMempool *blockchain.Mempool
+	// If no blocks exist, create new blockchain with genesis block
+	if len(bc.Blocks) == 0 {
+		bc, err = blockchain.NewBlockchain(dbInstance, mempool)
+		if err != nil {
+			panic(err)
+		}
+	}
 
-	newBc = blockchain.NewBlockchain("genesis-address", levelDBInstance, sqliteDBInstance)
-	newMempool = blockchain.NewMempool()
-
-	newHandler := handler.New(newBc, newMempool)
+	// http handlers
+	newHandler := handler.New(bc)
 
 	httpServer := HttpServer.New(Port, newHandler)
 

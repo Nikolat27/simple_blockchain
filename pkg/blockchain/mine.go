@@ -3,68 +3,92 @@ package blockchain
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 )
 
-func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddress string) *Block {
+func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddress string) (*Block, error) {
 	// Continuously mines new blocks until the operation is cancelled
-	for {
-		select {
-		case <-ctx.Done():
-			fmt.Println("Mining cancelled")
-			return nil
-		default:
-			transactions := mempool.GetTransactions()
+	select {
+	case <-ctx.Done():
+		fmt.Println("Mining cancelled")
+		return nil, nil
+	default:
+		transactions := mempool.GetTransactions()
 
-			coinBaseTx := Transaction{
-				To:         minerAddress,
-				Amount:     MiningReward,
-				Status:     "confirmed",
-				IsCoinbase: true,
-			}
+		// Priority based
+		bc.Mempool.SortTxsByFee(&transactions)
 
-			allTransactions := append([]Transaction{coinBaseTx}, transactions...)
+		coinBaseTx := createCoinbaseTx(minerAddress, MiningReward)
 
-			bc.mu.RLock()
-			prevHash := getPreviousBlockHash(bc.Blocks)
-			blockIndex := len(bc.Blocks)
-			bc.mu.RUnlock()
+		allTransactions := append([]Transaction{*coinBaseTx}, transactions...)
 
-			newBlock := &Block{
-				Index:        blockIndex,
-				PrevHash:     prevHash,
-				Timestamp:    time.Now(),
-				Transactions: allTransactions,
-				Nonce:        0,
-			}
+		bc.Mutex.RLock()
+		prevHash := getPreviousBlockHash(bc.Blocks)
+		blockIndex := len(bc.Blocks)
+		bc.Mutex.RUnlock()
 
-			if !proofOfWork(ctx, newBlock) {
-				return nil // cancelled
-			}
-
-			// block found
-			bc.AddBlock(newBlock)
-
-			if err := bc.updateUserBalances(newBlock.Transactions); err != nil {
-				log.Printf("failed to update the user balances: %v\n", err)
-			}
-
-			mempool.Clear()
+		newBlock := &Block{
+			Id:           int64(blockIndex),
+			PrevHash:     prevHash,
+			Hash:         nil,
+			Timestamp:    time.Now().Unix(),
+			Transactions: allTransactions,
+			Nonce:        0,
 		}
+
+		// mining started...
+		mined, err := proofOfWork(ctx, newBlock)
+		if err != nil {
+			return nil, fmt.Errorf("ERROR proofOfWork: %v", err)
+		}
+
+		if !mined {
+			fmt.Println("POW operation cancelled")
+			return nil, nil
+		}
+
+		sqlTx, err := bc.Database.BeginTx()
+		if err != nil {
+			return nil, err
+		}
+		defer sqlTx.Rollback()
+
+		// block found
+		if err := bc.AddBlock(sqlTx, newBlock); err != nil {
+			return nil, err
+		}
+
+		if err := bc.updateUserBalances(sqlTx, newBlock.Transactions); err != nil {
+			return nil, fmt.Errorf("ERROR failed to update the user balances: %v\n", err)
+		}
+
+		if err := sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+
+		bc.Mutex.Lock()
+		bc.Blocks = append(bc.Blocks, *newBlock)
+		bc.Mutex.Unlock()
+
+		mempool.Clear()
+		fmt.Println("Mined a block")
+		return newBlock, nil
 	}
 }
 
-func proofOfWork(ctx context.Context, block *Block) bool {
+func proofOfWork(ctx context.Context, block *Block) (bool, error) {
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("POW operation cancelled")
-			return false
+			// cancelled
+			return false, nil
 		default:
-			block.HashBlock()
+			if err := block.HashBlock(); err != nil {
+				return false, err
+			}
+
 			if block.IsValidHash() {
-				return true
+				return true, nil
 			}
 
 			block.Nonce++

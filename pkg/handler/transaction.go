@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
+func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		From       string `json:"from"`
 		To         string `json:"to"`
@@ -27,16 +27,19 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	txFee := handler.Blockchain.Mempool.CalculateFee(input.Amount)
+
 	newTx := blockchain.Transaction{
 		From:       input.From,
 		To:         input.To,
-		Amount:     input.Amount,
+		Amount:     input.Amount, // Full amount recipient receives
+		Fee:        txFee,        // Fee paid to miner
 		Status:     "pending",
 		Timestamp:  time.Now().UTC().Unix(),
 		IsCoinbase: false,
 	}
 
-	// Validate that the from address matches the public key
+	// Validate that the 'from' address matches the public key
 	derivedAddress, err := crypto.DeriveAddressFromPublicKey(input.PublicKey)
 	if err != nil {
 		utils.WriteJSON(w, http.StatusBadRequest, "Invalid public key format")
@@ -44,7 +47,8 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if derivedAddress != input.From {
-		utils.WriteJSON(w, http.StatusBadRequest, "'From' address does not match the provided public key")
+		utils.WriteJSON(w, http.StatusBadRequest,
+			"'From' address does not match the provided public key")
 		return
 	}
 
@@ -64,22 +68,39 @@ func (handler *Handler) AddTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.Mempool.AddTransaction(&newTx)
+	handler.Blockchain.Mempool.AddTransaction(&newTx)
 
-	resp := map[string]string{
-		"message": "Transaction added to mempool",
-		"status":  "pending",
+	resp := map[string]any{
+		"message":    "Transaction added to mempool",
+		"amount":     input.Amount,         // Amount recipient receives
+		"fee":        txFee,                // Fee paid to miner
+		"total_cost": input.Amount + txFee, // Total cost to sender
+		"status":     "pending",
 	}
 
 	utils.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (handler *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
-	transactions := handler.Mempool.GetTransactions()
+	transactions := handler.Blockchain.Mempool.GetTransactions()
 
 	resp := map[string]any{
 		"transactions": transactions,
 		"count":        len(transactions),
+	}
+
+	utils.WriteJSON(w, http.StatusOK, resp)
+}
+
+func (handler *Handler) GetCurrentTxFee(w http.ResponseWriter, r *http.Request) {
+	txFee := handler.Blockchain.Mempool.CalculateTxFee()
+
+	txFeePercentage := float64(txFee) / 100
+
+	resp := map[string]any{
+		"current_fee_percentage": txFeePercentage,
+		"current_fee_basis":      txFee,
+		"description":            "Fee is calculated as (amount * fee_basis) / 10000",
 	}
 
 	utils.WriteJSON(w, http.StatusOK, resp)
