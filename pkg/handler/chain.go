@@ -1,11 +1,14 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
+	"simple_blockchain/pkg/utils"
 )
 
 func (handler *Handler) GetBlockchain(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(handler.Blockchain)
+	resp := map[string]any{
+		"blockchain": handler.Node.Blockchain,
+	}
+
+	utils.WriteJSON(w, http.StatusOK, resp)
 }

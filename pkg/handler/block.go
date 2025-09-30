@@ -6,7 +6,7 @@ import (
 )
 
 func (handler *Handler) GetAllBlocks(w http.ResponseWriter, r *http.Request) {
-	blocks, err := handler.Blockchain.GetAllBlocks()
+	blocks, err := handler.Node.Blockchain.GetAllBlocks()
 	if err != nil {
 		utils.WriteJSON(w, http.StatusInternalServerError, err.Error())
 		return

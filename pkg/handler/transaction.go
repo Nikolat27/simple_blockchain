@@ -27,7 +27,7 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	txFee := handler.Blockchain.Mempool.CalculateFee(input.Amount)
+	txFee := handler.Node.Blockchain.Mempool.CalculateFee(input.Amount)
 
 	newTx := blockchain.Transaction{
 		From:       input.From,
@@ -63,12 +63,12 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := handler.Blockchain.ValidateTransaction(&newTx); err != nil {
+	if err := handler.Node.Blockchain.ValidateTransaction(&newTx); err != nil {
 		utils.WriteJSON(w, http.StatusBadRequest, err)
 		return
 	}
 
-	handler.Blockchain.Mempool.AddTransaction(&newTx)
+	handler.Node.Blockchain.Mempool.AddTransaction(&newTx)
 
 	resp := map[string]any{
 		"message":    "Transaction added to mempool",
@@ -82,7 +82,7 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 }
 
 func (handler *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
-	transactions := handler.Blockchain.Mempool.GetTransactions()
+	transactions := handler.Node.Blockchain.Mempool.GetTransactions()
 
 	resp := map[string]any{
 		"transactions": transactions,
@@ -93,7 +93,7 @@ func (handler *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) 
 }
 
 func (handler *Handler) GetCurrentTxFee(w http.ResponseWriter, r *http.Request) {
-	txFee := handler.Blockchain.Mempool.CalculateTxFee()
+	txFee := handler.Node.Blockchain.Mempool.CalculateTxFee()
 
 	txFeePercentage := float64(txFee) / 100
 

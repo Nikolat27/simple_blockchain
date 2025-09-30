@@ -6,7 +6,7 @@ import (
 )
 
 func (handler *Handler) ClearDatabase(w http.ResponseWriter, r *http.Request) {
-	if err := handler.Blockchain.Database.ClearAllData(); err != nil {
+	if err := handler.Node.Blockchain.Database.ClearAllData(); err != nil {
 		utils.WriteJSON(w, http.StatusBadRequest, err)
 		return
 	}

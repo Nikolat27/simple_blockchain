@@ -13,7 +13,7 @@ func (handler *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	balance, err := handler.Blockchain.GetBalance(address)
+	balance, err := handler.Node.Blockchain.GetBalance(address)
 	if err != nil {
 		utils.WriteJSON(w, http.StatusInternalServerError, err)
 		return
