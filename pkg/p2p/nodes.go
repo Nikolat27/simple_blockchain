@@ -106,6 +106,10 @@ func (node *Node) AddSeedNodesToDB() error {
 	}
 
 	for _, seed := range seeds {
+		if seed == "" {
+			continue
+		}
+
 		if err := node.Blockchain.Database.AddPeer(sqlTx, seed); err != nil {
 			return err
 		}
