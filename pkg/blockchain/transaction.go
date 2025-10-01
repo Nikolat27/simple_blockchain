@@ -65,7 +65,7 @@ func createCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
 		To:         minerAddress,
 		Amount:     miningReward,
 		Fee:        CoinbaseTxFee,
-		Timestamp:  time.Now().Unix(),
+		Timestamp:  time.Now().UnixNano(),
 		Status:     "confirmed",
 		IsCoinbase: true,
 	}

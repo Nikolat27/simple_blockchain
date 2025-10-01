@@ -27,9 +27,6 @@ func newRouter(handler *handler.Handler) *Router {
 		r.Post("/keys", handler.GenerateKeys)
 
 		r.Delete("/clear", handler.ClearDatabase)
-
-		r.Post("/node/join-network", handler.NodeJoinNetwork)
-		r.Get("/node/peers", handler.GetPeers)
 	})
 
 	return &Router{

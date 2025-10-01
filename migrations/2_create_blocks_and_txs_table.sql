@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS blocks
     id           INTEGER Primary Key AUTOINCREMENT,
     prev_hash    TEXT UNIQUE NOT NULL,
     hash         TEXT UNIQUE NOT NULL,
+    merkle_root  TEXT UNIQUE NOT NULL,
     nonce        INTEGER DEFAULT (0),
     timestamp    INTEGER DEFAULT (strftime('%s', 'now')),
     block_height INTEGER DEFAULT (0)

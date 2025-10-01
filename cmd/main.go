@@ -36,13 +36,12 @@ func main() {
 
 	mempool := blockchain.NewMempool()
 
-	// Try to load existing blockchain
+	// Load or initialize blockchain
 	bc, err := blockchain.LoadBlockchain(dbInstance, mempool)
 	if err != nil {
 		panic(err)
 	}
 
-	// If no blocks exist, create new blockchain with genesis block
 	if len(bc.Blocks) == 0 {
 		bc, err = blockchain.NewBlockchain(dbInstance, mempool)
 		if err != nil {
@@ -50,15 +49,13 @@ func main() {
 		}
 	}
 
+	// Start node
 	node, err := p2p.SetupNode(peerAddress, bc)
 	if err != nil {
 		panic(err)
 	}
 
-	if err := node.AddSeedNodesToDB(); err != nil {
-		panic(err )
-	}
-
+	// Load existing peers from DB if any
 	allPeers, err := node.Blockchain.Database.LoadPeers()
 	if err != nil {
 		panic(err)
@@ -66,9 +63,11 @@ func main() {
 
 	node.Peers = allPeers
 
-	// http handlers
-	newHandler := handler.New(node)
+	// Bootstrap node with DNS seeds
+	go node.Bootstrap()
 
+	// HTTP handlers
+	newHandler := handler.New(node)
 	httpServer := HttpServer.New(*httpPort, newHandler)
 
 	if err := httpServer.Run(); err != nil {

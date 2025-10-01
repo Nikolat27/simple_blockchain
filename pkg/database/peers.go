@@ -23,7 +23,7 @@ func (db *Database) GetPeers() (*sql.Rows, error) {
 		SELECT tcp_address FROM peers;
 	`
 
-	return db.db.Query(query, nil)
+	return db.db.Query(query)
 }
 
 func (db *Database) LoadPeers() ([]string, error) {
@@ -56,7 +56,7 @@ func (db *Database) PeerExist(tcpAddress string) (bool, error) {
 			return false, nil
 		}
 
-		return false, nil
+		return false, err
 	}
 
 	return true, nil
