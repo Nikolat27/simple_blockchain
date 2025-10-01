@@ -50,13 +50,24 @@ func main() {
 		}
 	}
 
-	newNode, err := p2p.NewNode(peerAddress, bc)
+	node, err := p2p.SetupNode(peerAddress, bc)
 	if err != nil {
 		panic(err)
 	}
 
+	if err := node.AddSeedNodesToDB(); err != nil {
+		panic(err )
+	}
+
+	allPeers, err := node.Blockchain.Database.LoadPeers()
+	if err != nil {
+		panic(err)
+	}
+
+	node.Peers = allPeers
+
 	// http handlers
-	newHandler := handler.New(newNode)
+	newHandler := handler.New(node)
 
 	httpServer := HttpServer.New(*httpPort, newHandler)
 

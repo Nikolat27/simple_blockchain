@@ -26,6 +26,25 @@ func (db *Database) GetPeers() (*sql.Rows, error) {
 	return db.db.Query(query, nil)
 }
 
+func (db *Database) LoadPeers() ([]string, error) {
+	rows, err := db.db.Query("SELECT tcp_address FROM peers")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var peers []string
+	for rows.Next() {
+		var addr string
+		if err := rows.Scan(&addr); err != nil {
+			return nil, err
+		}
+		peers = append(peers, addr)
+	}
+
+	return peers, rows.Err()
+}
+
 func (db *Database) PeerExist(tcpAddress string) (bool, error) {
 	query := `
 		SELECT 1 FROM peers WHERE tcp_address = ? LIMIT 1

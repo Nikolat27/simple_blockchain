@@ -1,11 +1,14 @@
 package p2p
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"os"
 	"simple_blockchain/pkg/blockchain"
+	"strings"
 )
 
 type Node struct {
@@ -17,7 +20,7 @@ type Node struct {
 	BlockchainRespCh chan []blockchain.Block // communication channel
 }
 
-func NewNode(address string, bc *blockchain.Blockchain) (*Node, error) {
+func SetupNode(address string, bc *blockchain.Blockchain) (*Node, error) {
 	tcpListener, err := net.Listen("tcp", address)
 	if err != nil {
 		return nil, err
@@ -87,4 +90,32 @@ func (node *Node) GetCurrentAddress() string {
 
 func (node *Node) VerifyBlockchain(chain *blockchain.Blockchain) (bool, error) {
 	return node.Blockchain.VerifyBlocks(chain.Blocks)
+}
+
+func (node *Node) AddSeedNodesToDB() error {
+	sqlTx, err := node.Blockchain.Database.BeginTx()
+	if err != nil {
+		return err
+	}
+
+	defer sqlTx.Rollback()
+
+	seeds := getSeedNodes()
+	if len(seeds) == 0 {
+		return errors.New("no seed node available")
+	}
+
+	for _, seed := range seeds {
+		if err := node.Blockchain.Database.AddPeer(sqlTx, seed); err != nil {
+			return err
+		}
+	}
+
+	return sqlTx.Commit()
+}
+
+func getSeedNodes() []string {
+	seedNodes := os.Getenv("SEED_NODES")
+
+	return strings.Split(seedNodes, ",")
 }

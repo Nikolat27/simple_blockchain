@@ -63,22 +63,10 @@ func (handler *Handler) NodeJoinNetwork(w http.ResponseWriter, r *http.Request) 
 }
 
 func (handler *Handler) GetPeers(w http.ResponseWriter, r *http.Request) {
-	rows, err := handler.Node.Blockchain.Database.GetPeers()
+	peers, err := handler.Node.Blockchain.Database.LoadPeers()
 	if err != nil {
 		utils.WriteJSON(w, http.StatusInternalServerError, err)
 		return
-	}
-	defer rows.Close()
-
-	var peers []string
-	for rows.Next() {
-		var peer string
-		if err := rows.Scan(&peer); err != nil {
-			utils.WriteJSON(w, http.StatusInternalServerError, err)
-			return
-		}
-
-		peers = append(peers, peer)
 	}
 
 	utils.WriteJSON(w, http.StatusOK, peers)
