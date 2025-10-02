@@ -38,7 +38,7 @@ func (node *Node) parseMessage(senderMsg []byte) error {
 	case types.SendBlockMsg:
 		node.payloadCh <- msg.Payload
 
-	case types.BroadcastBlockMsg:
+	case types.BlockBroadcastMsg:
 		return node.handleBroadcastBlock(msg.Payload)
 
 	default:

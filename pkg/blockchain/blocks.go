@@ -14,7 +14,7 @@ import (
 type Block struct {
 	Id           int64         `json:"id"`
 	PrevHash     []byte        `json:"prev_hash"`
-	Hash         []byte        `json:"hash"`
+	Hash         []byte        `json:"Hash"`
 	MerkleRoot   []byte        `json:"merkle_root"`
 	Timestamp    int64         `json:"timestamp"`
 	Nonce        int64         `json:"nonce"`
@@ -24,7 +24,7 @@ type Block struct {
 type BlockHeader struct {
 	Id         int64  `json:"id"`
 	PrevHash   []byte `json:"prev_hash"`
-	Hash       []byte `json:"hash"`
+	Hash       []byte `json:"Hash"`
 	MerkleRoot []byte `json:"merkle_root"`
 	Timestamp  int64  `json:"timestamp"`
 	Nonce      int64  `json:"nonce"`
@@ -102,7 +102,7 @@ func (block *Block) SerializeTransactions() string {
 }
 
 func (block *Block) ComputeMerkleRoot() {
-	// empty tree -> hash of empty byte slice
+	// empty tree -> Hash of empty byte slice
 	if len(block.Transactions) == 0 {
 		h := sha256.Sum256([]byte{})
 		block.MerkleRoot = h[:]

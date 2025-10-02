@@ -6,7 +6,7 @@ import (
 )
 
 type Mempool struct {
-	Transactions []Transaction `json:"transactions"`
+	Transactions map[string]Transaction `json:"transactions"`
 	Mutex        sync.RWMutex
 }
 
@@ -15,7 +15,7 @@ const HighTxFee = 200 // 2%
 
 func NewMempool() *Mempool {
 	return &Mempool{
-		Transactions: make([]Transaction, 0),
+		Transactions: make(map[string]Transaction),
 	}
 }
 
@@ -23,18 +23,16 @@ func (mp *Mempool) AddTransaction(tx *Transaction) {
 	mp.Mutex.Lock()
 	defer mp.Mutex.Unlock()
 
-	mp.Transactions = append(mp.Transactions, *tx)
+	hash := tx.Hash().EncodeToString()
+
+	mp.Transactions[hash] = *tx
 }
 
-func (mp *Mempool) GetTransactions() []Transaction {
+func (mp *Mempool) GetTransactions() map[string]Transaction {
 	mp.Mutex.RLock()
 	defer mp.Mutex.RUnlock()
 
-	// Return a copy to prevent external modification
-	transactions := make([]Transaction, len(mp.Transactions))
-	copy(transactions, mp.Transactions)
-
-	return transactions
+	return mp.Transactions
 }
 
 // SortTxsByFee -> sort transactions in DESC order by their fee
@@ -48,7 +46,7 @@ func (mp *Mempool) Clear() {
 	mp.Mutex.Lock()
 	defer mp.Mutex.Unlock()
 
-	mp.Transactions = []Transaction{}
+	mp.Transactions = make(map[string]Transaction)
 }
 
 func (mp *Mempool) CalculateTxFee() uint64 {

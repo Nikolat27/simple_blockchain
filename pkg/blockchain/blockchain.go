@@ -386,7 +386,7 @@ func (bc *Blockchain) VerifyHeaders(headers []BlockHeader) (bool, error) {
 
 	var emptyHash [sha256.Size]byte
 	if !bytes.Equal(genesis.PrevHash, emptyHash[:]) {
-		return false, fmt.Errorf("genesis block must have empty prev hash")
+		return false, fmt.Errorf("genesis block must have empty prev Hash")
 	}
 
 	for idx, header := range headers {
@@ -394,7 +394,7 @@ func (bc *Blockchain) VerifyHeaders(headers []BlockHeader) (bool, error) {
 		if idx > 0 {
 			prevHash = headers[idx-1].Hash
 		} else {
-			// Genesis block has no previous hash
+			// Genesis block has no previous Hash
 			prevHash = make([]byte, sha256.Size)
 		}
 
@@ -438,7 +438,7 @@ func (bc *Blockchain) GetBlockById(blockId int64) (*Block, error) {
 
 	block.Hash, err = hex.DecodeString(hashStr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode hash: %v", err)
+		return nil, fmt.Errorf("failed to decode Hash: %v", err)
 	}
 
 	block.MerkleRoot, err = hex.DecodeString(merkleRootStr)
@@ -472,4 +472,19 @@ func (bc *Blockchain) AddBlockToMemory(block *Block) bool {
 
 	bc.Blocks = append(bc.Blocks, *block)
 	return true
+}
+
+func (bc *Blockchain) SyncMempool(mempool *Mempool) {
+	bc.Mempool.Mutex.Lock()
+	defer bc.Mempool.Mutex.Unlock()
+
+	for idx, tx := range mempool.Transactions {
+		for _, existingTx := range bc.Mempool.Transactions {
+			if existingTx.
+		}
+
+		if _, exists := bc.Mempool.Transactions[idx]; !exists {
+			bc.Mempool.Transactions[idx] = tx
+		}
+	}
 }

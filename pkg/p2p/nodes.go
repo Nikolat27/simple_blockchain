@@ -226,7 +226,7 @@ func (node *Node) BroadcastBlock(block *blockchain.Block) error {
 		return fmt.Errorf("failed to marshal block: %w", err)
 	}
 
-	msg := types.NewMessage(types.BroadcastBlockMsg, node.GetCurrentTcpAddress(), payload)
+	msg := types.NewMessage(types.BlockBroadcastMsg, node.GetCurrentTcpAddress(), payload)
 
 	fmt.Println("available peers: ", node.Peers)
 

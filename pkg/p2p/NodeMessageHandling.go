@@ -115,6 +115,18 @@ func (node *Node) handleBroadcastBlock(payload types.Payload) error {
 	return nil
 }
 
+// handleBroadcastMempool -> Propose the new mempool
+func (node *Node) handleBroadcastMempool(payload types.Payload) error {
+	var mempool blockchain.Mempool
+	if err := payload.Unmarshal(&mempool); err != nil {
+		return fmt.Errorf("failed to unmarshal broadcast block: %w", err)
+	}
+
+	node.Blockchain.Mempool = &mempool
+
+	return nil
+}
+
 func (node *Node) AddNewPeer(newPeerAddress string) error {
 	if slices.Contains(node.Peers, newPeerAddress) {
 		return nil
