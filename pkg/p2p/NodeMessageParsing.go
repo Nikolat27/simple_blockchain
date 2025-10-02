@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"simple_blockchain/pkg/p2p/types"
 )
 
@@ -15,8 +14,6 @@ func (node *Node) parseMessage(senderMsg []byte) error {
 		return err
 	}
 
-	log.Printf("DEBUG: Received message type: %s from: %s", msg.Type, msg.SenderAddress)
-
 	if msg.SenderAddress == "" {
 		return errors.New("msg senderAddress field is empty")
 	}
@@ -24,10 +21,10 @@ func (node *Node) parseMessage(senderMsg []byte) error {
 	switch msg.Type {
 	// Requesting the blockchain`s data
 	case types.RequestHeadersMsg:
-		return node.handleGetHeaders(msg.SenderAddress)
+		return node.handleGetBlockHeaders(msg.SenderAddress)
 
-		// Sending the blockchain`s data to the applicant
-	case types.SendHeadersMsg:
+	// Sending the blockchain`s data to the applicant node
+	case types.SendBlockHeadersMsg:
 		node.payloadCh <- msg.Payload
 
 	case types.RequestBlockMsg:
