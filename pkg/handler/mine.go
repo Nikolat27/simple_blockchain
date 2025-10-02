@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 	"simple_blockchain/pkg/utils"
 )
@@ -31,8 +31,10 @@ func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := handler.Node.BroadcastBlock(minedBlock); err != nil {
-		log.Printf("Failed to broadcast block: %v", err)
-		// Don't fail the request if broadcast fails
+		utils.WriteJSON(w, http.StatusInternalServerError,
+			fmt.Errorf("failed to broadcast block: %v", err))
+
+		return
 	}
 
 	utils.WriteJSON(w, http.StatusOK, minedBlock)
