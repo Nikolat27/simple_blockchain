@@ -16,6 +16,7 @@ import (
 func main() {
 	httpPort := flag.String("port", "8000", "http port")
 	tcpPort := flag.String("node-port", "8080", "tcp port")
+	dbDSN := flag.String("dsn", "blockchain_db.sqlite", "database data source name")
 
 	flag.Parse()
 
@@ -28,6 +29,7 @@ func main() {
 	dbDriverName := os.Getenv("DB_DRIVER_NAME")
 	dataSourceName := os.Getenv("DATA_SOURCE_NAME")
 
+	dataSourceName = *dbDSN
 	dbInstance, err := database.New(dbDriverName, dataSourceName)
 	if err != nil {
 		panic(err)
@@ -36,13 +38,12 @@ func main() {
 
 	mempool := blockchain.NewMempool()
 
-	// Try to load existing blockchain
+	// Load or initialize blockchain
 	bc, err := blockchain.LoadBlockchain(dbInstance, mempool)
 	if err != nil {
 		panic(err)
 	}
 
-	// If no blocks exist, create new blockchain with genesis block
 	if len(bc.Blocks) == 0 {
 		bc, err = blockchain.NewBlockchain(dbInstance, mempool)
 		if err != nil {
@@ -50,14 +51,25 @@ func main() {
 		}
 	}
 
-	newNode, err := p2p.NewNode(peerAddress, bc)
+	// Start node
+	node, err := p2p.SetupNode(peerAddress, bc)
 	if err != nil {
 		panic(err)
 	}
 
-	// http handlers
-	newHandler := handler.New(newNode)
+	// Load existing peers from DB if any
+	allPeers, err := node.Blockchain.Database.LoadPeers()
+	if err != nil {
+		panic(err)
+	}
 
+	node.Peers = allPeers
+
+	// Bootstrap node with DNS seeds
+	go node.Bootstrap()
+
+	// HTTP handlers
+	newHandler := handler.New(node)
 	httpServer := HttpServer.New(*httpPort, newHandler)
 
 	if err := httpServer.Run(); err != nil {

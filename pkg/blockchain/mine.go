@@ -3,6 +3,7 @@ package blockchain
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -58,20 +59,16 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 			return nil, err
 		}
 
-		if err := bc.updateUserBalances(sqlTx, newBlock.Transactions); err != nil {
-			return nil, fmt.Errorf("ERROR failed to update the user balances: %v\n", err)
-		}
-
 		if err := sqlTx.Commit(); err != nil {
 			return nil, err
 		}
 
-		bc.Mutex.Lock()
-		bc.Blocks = append(bc.Blocks, *newBlock)
-		bc.Mutex.Unlock()
+		bc.AddBlockToMemory(newBlock)
 
 		mempool.Clear()
-		fmt.Println("Mined a block")
+
+		log.Println("Mined a block")
+
 		return newBlock, nil
 	}
 }

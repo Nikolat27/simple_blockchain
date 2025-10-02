@@ -1,51 +1,159 @@
 package p2p
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"simple_blockchain/pkg/blockchain"
+	"simple_blockchain/pkg/p2p/types"
 	"slices"
+	"time"
 )
 
-func (node *Node) handleNodeJoinNetwork(requestorAddr string) error {
-	// Requesting the application node`s blockchain data
-	getBlockchainMsg := NewMessage(SendBlockchainDataMsg, node.GetCurrentAddress(), nil)
-
-	// Request blockchain data
-	if err := node.Write(requestorAddr, getBlockchainMsg.Marshal()); err != nil {
-		return err
+func (node *Node) handleGetBlockHeaders(requestorAddr string) error {
+	if err := node.AddNewPeer(requestorAddr); err != nil {
+		log.Printf("Failed to add peer %s: %v", requestorAddr, err)
+		// Continue
 	}
 
-	// Waits for blockchain data from the node`s channel
-	blocks := <-node.blockchainRespCh
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	valid, err := node.Blockchain.VerifyBlocks(blocks)
-	if err != nil {
-		return err
-	}
-
-	if !valid {
-		return errors.New("received blockchain is corrupted")
-	}
-
-	node.AddNewPeer(requestorAddr)
-
-	fmt.Printf("Node: %s verified Node: %s\n", node.GetCurrentAddress(), requestorAddr)
-	return nil
-}
-
-func (node *Node) handleGetBlockchainData(requestorAddr string) error {
 	blocks, err := node.Blockchain.GetAllBlocks()
 	if err != nil {
 		return err
 	}
 
-	msg := NewMessage(GetBlockchainDataMsg, node.GetCurrentAddress(), blocks)
+	headers := make([]blockchain.BlockHeader, len(blocks))
+	for idx, block := range blocks {
+		headers[idx] = *block.GetHeader()
+	}
 
-	return node.Write(requestorAddr, msg.Marshal())
+	payload, err := json.Marshal(headers)
+	if err != nil {
+		return err
+	}
+
+	msg := types.NewMessage(types.SendBlockHeadersMsg, node.GetCurrentTcpAddress(), payload)
+	return node.WriteMessage(ctx, requestorAddr, msg.Marshal())
 }
 
-func (node *Node) AddNewPeer(newPeerAddress string) {
-	if !slices.Contains(node.Peers, newPeerAddress) {
-		node.Peers = append(node.Peers, newPeerAddress)
+func (node *Node) handleGetBlock(requestorAddr string, blockId int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	block, err := node.Blockchain.GetBlockById(blockId)
+	if err != nil {
+		return err
 	}
+
+	payload, err := json.Marshal(block)
+	if err != nil {
+		return err
+	}
+
+	msg := types.NewMessage(types.SendBlockMsg, node.GetCurrentTcpAddress(), payload)
+
+	return node.WriteMessage(ctx, requestorAddr, msg.Marshal())
+}
+
+func (node *Node) handleGetBlockchainData(requestorAddr string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	blocks, err := node.Blockchain.GetAllBlocks()
+	if err != nil {
+		return err
+	}
+
+	payload, err := json.Marshal(blocks)
+	if err != nil {
+		return err
+	}
+
+	msg := types.NewMessage(types.SendBlockHeadersMsg, node.GetCurrentTcpAddress(), payload)
+
+	return node.WriteMessage(ctx, requestorAddr, msg.Marshal())
+}
+
+// handleBroadcastBlock -> Propose the new block
+func (node *Node) handleBroadcastBlock(payload types.Payload) error {
+	var block blockchain.Block
+	if err := payload.Unmarshal(&block); err != nil {
+		return fmt.Errorf("failed to unmarshal broadcast block: %w", err)
+	}
+
+	fmt.Println("Current Node: ", node.GetCurrentTcpAddress())
+
+	valid, err := node.Blockchain.VerifyBlock(&block)
+	if err != nil {
+		return err
+	}
+
+	if !valid {
+		return errors.New("block is corrupted")
+	}
+
+	sqlTx, err := node.Blockchain.Database.BeginTx()
+	if err != nil {
+		return err
+	}
+	defer sqlTx.Rollback()
+
+	if err := node.Blockchain.AddBlock(sqlTx, &block); err != nil {
+		return err
+	}
+
+	if err := sqlTx.Commit(); err != nil {
+		return err
+	}
+
+	node.Blockchain.AddBlockToMemory(&block)
+
+	return nil
+}
+
+// handleBroadcastMempool -> Propose the new mempool
+func (node *Node) handleBroadcastMempool(payload types.Payload) error {
+	var mempool blockchain.Mempool
+	if err := payload.Unmarshal(&mempool); err != nil {
+		return fmt.Errorf("failed to unmarshal broadcast block: %w", err)
+	}
+
+	node.Blockchain.Mempool = &mempool
+
+	return nil
+}
+
+func (node *Node) AddNewPeer(newPeerAddress string) error {
+	if slices.Contains(node.Peers, newPeerAddress) {
+		return nil
+	}
+
+	sqlTx, err := node.Blockchain.Database.BeginTx()
+	if err != nil {
+		return err
+	}
+	defer sqlTx.Rollback()
+
+	if err := node.Blockchain.Database.AddPeer(sqlTx, newPeerAddress); err != nil {
+		return err
+	}
+
+	if err := sqlTx.Commit(); err != nil {
+		return err
+	}
+
+	node.addPeerToMemory(newPeerAddress)
+
+	return nil
+}
+
+func (node *Node) addPeerToMemory(newPeer string) {
+	node.mutex.Lock()
+	defer node.mutex.Unlock()
+
+	node.Peers = append(node.Peers, newPeer)
 }

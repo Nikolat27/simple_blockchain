@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"simple_blockchain/pkg/p2p/types"
 )
 
 func (node *Node) parseMessage(senderMsg []byte) error {
-	var msg Message
+	var msg types.Message
 
 	if err := json.Unmarshal(senderMsg, &msg); err != nil {
 		return err
@@ -18,17 +19,27 @@ func (node *Node) parseMessage(senderMsg []byte) error {
 	}
 
 	switch msg.Type {
+	// Requesting the blockchain`s data
+	case types.RequestHeadersMsg:
+		return node.handleGetBlockHeaders(msg.SenderAddress)
 
-	case JoinNetworkMsg:
-		return node.handleNodeJoinNetwork(msg.SenderAddress)
+	// Sending the blockchain`s data to the applicant node
+	case types.SendBlockHeadersMsg:
+		node.payloadCh <- msg.Payload
 
-		// Requesting the blockchain`s data
-	case SendBlockchainDataMsg:
-		return node.handleGetBlockchainData(msg.SenderAddress)
+	case types.RequestBlockMsg:
+		var blockId int64
+		if err := msg.Payload.Unmarshal(&blockId); err != nil {
+			return err
+		}
 
-		// Sending the blockchain`s data to the applicant
-	case GetBlockchainDataMsg:
-		node.blockchainRespCh <- msg.Blocks
+		return node.handleGetBlock(msg.SenderAddress, blockId)
+
+	case types.SendBlockMsg:
+		node.payloadCh <- msg.Payload
+
+	case types.BlockBroadcastMsg:
+		return node.handleBroadcastBlock(msg.Payload)
 
 	default:
 		fmt.Println("meow meow")

@@ -2,7 +2,7 @@ package handler
 
 import (
 	"net/http"
-	"simple_blockchain/pkg/crypto"
+	"simple_blockchain/pkg/CryptoGraphy"
 	"simple_blockchain/pkg/utils"
 )
 
@@ -27,7 +27,7 @@ func (handler *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler *Handler) GenerateKeys(w http.ResponseWriter, r *http.Request) {
-	keyPair, err := crypto.GenerateKeyPair()
+	keyPair, err := CryptoGraphy.GenerateKeyPair()
 	if err != nil {
 		utils.WriteJSON(w, http.StatusInternalServerError, "Failed to generate key pair: "+err.Error())
 		return

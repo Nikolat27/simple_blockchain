@@ -49,13 +49,8 @@ func (db *Database) BeginTx() (*sql.Tx, error) {
 	return db.db.Begin()
 }
 
-// ClearAllData removes all blockchain data (used when corruption is detected)
-func (db *Database) ClearAllData() error {
-	tx, err := db.BeginTx()
-	if err != nil {
-		return err
-	}
-
+// ClearAllData -> Flush the database
+func (db *Database) ClearAllData(sqlTx *sql.Tx) error {
 	queries := []string{
 		"DELETE FROM transactions",
 		"DELETE FROM blocks",
@@ -63,14 +58,10 @@ func (db *Database) ClearAllData() error {
 	}
 
 	for _, query := range queries {
-		if _, err := tx.Exec(query); err != nil {
-			if err := tx.Rollback(); err != nil {
-				return err
-			}
-
+		if _, err := sqlTx.Exec(query); err != nil {
 			return err
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }

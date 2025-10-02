@@ -7,6 +7,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// LoadEnv -> Create and Load the .env file if it does not exist
 func LoadEnv() error {
 	if _, err := os.Stat(".env"); os.IsNotExist(err) {
 		file, err := os.Create(".env")

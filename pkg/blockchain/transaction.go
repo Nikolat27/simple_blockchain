@@ -2,8 +2,9 @@ package blockchain
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
-	"simple_blockchain/pkg/crypto"
+	"simple_blockchain/pkg/CryptoGraphy"
 	"time"
 )
 
@@ -21,7 +22,13 @@ type Transaction struct {
 	IsCoinbase bool   `json:"is_coinbase"`
 }
 
-func (tx *Transaction) hash() []byte {
+type TxHash []byte
+
+func (hash TxHash) EncodeToString() string {
+	return hex.EncodeToString(hash)
+}
+
+func (tx *Transaction) Hash() TxHash {
 	txCopy := *tx
 
 	txCopy.Signature = nil
@@ -32,21 +39,22 @@ func (tx *Transaction) hash() []byte {
 	return hash[:]
 }
 
-func (tx *Transaction) Sign(keyPair *crypto.KeyPair) error {
+func (tx *Transaction) Sign(keyPair *CryptoGraphy.KeyPair) error {
 	tx.PublicKey = keyPair.GetPublicKeyHex() // Set PublicKey BEFORE hashing
-	hash := tx.hash()
+	hash := tx.Hash()
+
 	tx.Signature = keyPair.Sign(hash)
 	return nil
 }
 
 func (tx *Transaction) SignWithHexKeys(privateKeyHex, publicKeyHex string) error {
-	keyPair, err := crypto.LoadKeyPairFromHex(privateKeyHex, publicKeyHex)
+	keyPair, err := CryptoGraphy.LoadKeyPairFromHex(privateKeyHex, publicKeyHex)
 	if err != nil {
 		return err
 	}
 
 	tx.PublicKey = keyPair.GetPublicKeyHex()
-	hash := tx.hash()
+	hash := tx.Hash()
 	tx.Signature = keyPair.Sign(hash)
 	return nil
 }
@@ -56,8 +64,8 @@ func (tx *Transaction) Verify() bool {
 		return false
 	}
 
-	hash := tx.hash()
-	return crypto.VerifySignature(tx.PublicKey, hash, tx.Signature)
+	hash := tx.Hash()
+	return CryptoGraphy.VerifySignature(tx.PublicKey, hash, tx.Signature)
 }
 
 func createCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
@@ -65,7 +73,7 @@ func createCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
 		To:         minerAddress,
 		Amount:     miningReward,
 		Fee:        CoinbaseTxFee,
-		Timestamp:  time.Now().Unix(),
+		Timestamp:  time.Now().UnixNano(),
 		Status:     "confirmed",
 		IsCoinbase: true,
 	}

@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"errors"
@@ -48,6 +49,8 @@ func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
 		return nil, err
 	}
 
+	bc.AddBlockToMemory(genesisBlock)
+
 	return bc, nil
 }
 
@@ -83,7 +86,7 @@ func (bc *Blockchain) VerifyBlocks(blocks []Block) (bool, error) {
 	}
 
 	for _, block := range blocks {
-		isVerified, err := bc.verifyBlock(&block)
+		isVerified, err := bc.VerifyBlock(&block)
 		if err != nil {
 			return false, err
 		}
@@ -92,7 +95,7 @@ func (bc *Blockchain) VerifyBlocks(blocks []Block) (bool, error) {
 			return false, nil
 		}
 
-		bc.Blocks = append(bc.Blocks, block)
+		bc.AddBlockToMemory(&block)
 	}
 
 	return true, nil
@@ -101,9 +104,18 @@ func (bc *Blockchain) VerifyBlocks(blocks []Block) (bool, error) {
 func startFresh(db *database.Database) (*Blockchain, error) {
 	log.Println("Found corrupted blockchain data, clearing database")
 
-	// ClearAllData -> Flush the database
-	if err := db.ClearAllData(); err != nil {
-		return nil, fmt.Errorf("ERROR clearing corrupted data: %v", err)
+	sqlTx, err := db.BeginTx()
+	if err != nil {
+		return nil, err
+	}
+	defer sqlTx.Rollback()
+
+	if err := db.ClearAllData(sqlTx); err != nil {
+		return nil, fmt.Errorf("ERROR clearing corrupted data: %w", err)
+	}
+
+	if err := sqlTx.Commit(); err != nil {
+		return nil, err
 	}
 
 	return &Blockchain{
@@ -113,22 +125,22 @@ func startFresh(db *database.Database) (*Blockchain, error) {
 }
 
 func (bc *Blockchain) AddBlock(sqlTx *sql.Tx, newBlock *Block) error {
-	bc.Mutex.Lock()
-	defer bc.Mutex.Unlock()
-
 	prevHashStr := hex.EncodeToString(newBlock.PrevHash)
 	hashStr := hex.EncodeToString(newBlock.Hash)
+	merkleRootStr := hex.EncodeToString(newBlock.MerkleRoot)
 
-	// Add block to database with block height
-	blockId, err := bc.Database.AddBlock(sqlTx, prevHashStr, hashStr, newBlock.Nonce, newBlock.Timestamp,
-		newBlock.Id)
+	blockId, err := bc.Database.AddBlock(sqlTx, prevHashStr, hashStr, merkleRootStr,
+		newBlock.Nonce, newBlock.Timestamp, newBlock.Id)
 
 	if err != nil {
-		return fmt.Errorf("ERROR adding block: %v\n", err)
+		return err
 	}
 
-	// AddTransactionToDB -> Add the blocks txs to the database
 	if err := bc.AddTransactionToDB(sqlTx, int(blockId), newBlock.Transactions); err != nil {
+		return err
+	}
+
+	if err := bc.UpdateUserBalances(sqlTx, newBlock.Transactions); err != nil {
 		return err
 	}
 
@@ -152,7 +164,7 @@ func (bc *Blockchain) AddTransactionToDB(dbTx *sql.Tx, blockId int, txs []Transa
 		}
 
 		if err := bc.Database.AddTransaction(dbTx, txInstance, blockId); err != nil {
-			return fmt.Errorf("ERROR adding transaction: %v\n", err)
+			return fmt.Errorf("ERROR adding transaction: %w", err)
 		}
 	}
 
@@ -194,11 +206,11 @@ func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
 func (bc *Blockchain) parseBlock(rows *sql.Rows) (*Block, error) {
 	var block Block
 
-	var prevHashStr, hashStr string
+	var prevHashStr, hashStr, merkleRootStr string
 	var dbId int // database ID (index), not used for block identification
 
-	if err := rows.Scan(&dbId, &prevHashStr,
-		&hashStr, &block.Nonce, &block.Timestamp, &block.Id); err != nil {
+	if err := rows.Scan(&dbId, &prevHashStr, &hashStr, &merkleRootStr, &block.Nonce,
+		&block.Timestamp, &block.Id); err != nil {
 
 		return nil, err
 	}
@@ -215,6 +227,11 @@ func (bc *Blockchain) parseBlock(rows *sql.Rows) (*Block, error) {
 		return nil, fmt.Errorf("failed to decode 'hashStr': %v", err)
 	}
 
+	block.MerkleRoot, err = hex.DecodeString(merkleRootStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode 'merkleRootStr': %v", err)
+	}
+
 	// Load transactions for this block using database ID
 	dbTransactions, err := bc.Database.GetTransactionsByBlockId(dbId)
 	if err != nil {
@@ -228,7 +245,7 @@ func (bc *Blockchain) parseBlock(rows *sql.Rows) (*Block, error) {
 	return &block, nil
 }
 
-func (bc *Blockchain) verifyBlock(block *Block) (bool, error) {
+func (bc *Blockchain) VerifyBlock(block *Block) (bool, error) {
 	tempBlock := &Block{
 		Id:           block.Id,
 		PrevHash:     block.PrevHash,
@@ -244,8 +261,18 @@ func (bc *Blockchain) verifyBlock(block *Block) (bool, error) {
 
 	hashMatches := bytes.Equal(tempBlock.Hash, block.Hash)
 
-	if hashMatches && isGenesisBlock(tempBlock.Id) {
-		return true, nil
+	// No more validation for genesis block
+	if block.Id == 0 {
+		return hashMatches, nil
+	}
+
+	prevBlock, err := bc.GetBlockById(block.Id - 1)
+	if err != nil {
+		return false, err
+	}
+
+	if !bytes.Equal(prevBlock.Hash, tempBlock.PrevHash) {
+		return false, err
 	}
 
 	return hashMatches && tempBlock.IsValidHash(), nil
@@ -276,7 +303,7 @@ func (bc *Blockchain) GetBalance(address string) (uint64, error) {
 	return effectiveBalance, nil
 }
 
-func (bc *Blockchain) updateUserBalances(sqlTx *sql.Tx, txs []Transaction) error {
+func (bc *Blockchain) UpdateUserBalances(sqlTx *sql.Tx, txs []Transaction) error {
 	// Calculate total fees from all transactions in this block
 	var totalFees uint64
 
@@ -347,6 +374,117 @@ func getUserPendingOutgoing(address string, mempoolTxs []Transaction) uint64 {
 	return pending
 }
 
-func isGenesisBlock(id int64) bool {
-	return id == 0
+func (bc *Blockchain) VerifyHeaders(headers []BlockHeader) (bool, error) {
+	if len(headers) == 0 {
+		return true, nil
+	}
+
+	genesis := headers[0]
+	if genesis.Id != 0 {
+		return false, fmt.Errorf("first block must have ID 0")
+	}
+
+	var emptyHash [sha256.Size]byte
+	if !bytes.Equal(genesis.PrevHash, emptyHash[:]) {
+		return false, fmt.Errorf("genesis block must have empty prev Hash")
+	}
+
+	for idx, header := range headers {
+		var prevHash []byte
+		if idx > 0 {
+			prevHash = headers[idx-1].Hash
+		} else {
+			// Genesis block has no previous Hash
+			prevHash = make([]byte, sha256.Size)
+		}
+
+		verified, err := header.Verify(int64(idx), prevHash)
+		if err != nil {
+			return false, err
+		}
+
+		if !verified {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func (bc *Blockchain) GetBlockById(blockId int64) (*Block, error) {
+	row, err := bc.Database.GetBlockById(blockId)
+	if err != nil {
+		return nil, err
+	}
+
+	var block Block
+	var prevHashStr, hashStr, merkleRootStr string
+	var dbId int // database ID (index)
+
+	if err := row.Scan(&dbId, &prevHashStr, &hashStr, &merkleRootStr,
+		&block.Nonce, &block.Timestamp, &block.Id); err != nil {
+
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+
+		return nil, err
+	}
+
+	block.PrevHash, err = hex.DecodeString(prevHashStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode prevHash: %v", err)
+	}
+
+	block.Hash, err = hex.DecodeString(hashStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode Hash: %v", err)
+	}
+
+	block.MerkleRoot, err = hex.DecodeString(merkleRootStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode merkleRoot: %v", err)
+	}
+
+	// Load transactions for this block
+	dbTransactions, err := bc.Database.GetTransactionsByBlockId(dbId)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := block.parseDBTransactions(dbTransactions); err != nil {
+		return nil, err
+	}
+
+	return &block, nil
+}
+
+func (bc *Blockchain) AddBlockToMemory(block *Block) bool {
+	bc.Mutex.Lock()
+	defer bc.Mutex.Unlock()
+
+	// Check for duplicate block ID
+	for _, existing := range bc.Blocks {
+		if existing.Id == block.Id {
+			return false // Block already exists
+		}
+	}
+
+	bc.Blocks = append(bc.Blocks, *block)
+	return true
+}
+
+func (bc *Blockchain) SyncMempool(mempool *Mempool) {
+	bc.Mempool.Mutex.Lock()
+	defer bc.Mempool.Mutex.Unlock()
+
+	for idx, tx := range mempool.Transactions {
+		for _, existingTx := range bc.Mempool.Transactions {
+			if existingTx.
+		}
+
+		if _, exists := bc.Mempool.Transactions[idx]; !exists {
+			bc.Mempool.Transactions[idx] = tx
+		}
+	}
 }
