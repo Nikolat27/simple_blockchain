@@ -6,8 +6,20 @@ import (
 )
 
 func (handler *Handler) ClearDatabase(w http.ResponseWriter, r *http.Request) {
-	if err := handler.Node.Blockchain.Database.ClearAllData(); err != nil {
+	sqlTx, err := handler.Node.Blockchain.Database.BeginTx()
+	if err != nil {
+		utils.WriteJSON(w, http.StatusInternalServerError, err)
+		return
+	}
+	defer sqlTx.Rollback()
+
+	if err := handler.Node.Blockchain.Database.ClearAllData(sqlTx); err != nil {
 		utils.WriteJSON(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if err := sqlTx.Commit(); err != nil {
+		utils.WriteJSON(w, http.StatusInternalServerError, err)
 		return
 	}
 
