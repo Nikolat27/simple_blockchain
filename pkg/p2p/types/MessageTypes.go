@@ -6,11 +6,11 @@ import (
 )
 
 const (
-	RequestHeadersMsg = "get_headers_msg"
-	SendHeadersMsg    = "send_headers_msg"
-	RequestBlockMsg   = "get_block_msg" // NEW: request specific block
-	SendBlockMsg      = "send_block_msg"
-	BroadcastBlockMsg = "broadcast_block_msg"
+	RequestHeadersMsg   = "get_headers_msg"
+	SendBlockHeadersMsg = "send_headers_msg"
+	RequestBlockMsg     = "get_block_msg"
+	SendBlockMsg        = "send_block_msg"
+	BroadcastBlockMsg   = "broadcast_block_msg"
 )
 
 type Payload []byte

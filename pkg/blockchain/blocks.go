@@ -180,8 +180,8 @@ func createGenesisBlock() (*Block, error) {
 }
 
 func (header *BlockHeader) Verify(idx int64, prevHeaderHash []byte) (bool, error) {
-	if !header.verifyHeaderHash() {
-		return false, errors.New("verifyHeaderHash error")
+	if !header.verifyHash() {
+		return false, errors.New("verifyHash error")
 	}
 
 	if idx != header.Id {
@@ -193,8 +193,8 @@ func (header *BlockHeader) Verify(idx int64, prevHeaderHash []byte) (bool, error
 		return true, nil
 	}
 
-	if !header.isValidHeaderHash() {
-		return false, errors.New("isValidHeaderHash error")
+	if !header.isDifficultyHashValid() {
+		return false, errors.New("isDifficultyHashValid error")
 	}
 
 	if !bytes.Equal(header.PrevHash, prevHeaderHash) {
@@ -212,12 +212,12 @@ func (header *BlockHeader) Verify(idx int64, prevHeaderHash []byte) (bool, error
 	return true, nil
 }
 
-func (header *BlockHeader) isValidHeaderHash() bool {
+func (header *BlockHeader) isDifficultyHashValid() bool {
 	hashStr := hex.EncodeToString(header.Hash)
 	return strings.HasPrefix(hashStr, strings.Repeat("0", Difficulty))
 }
 
-func (header *BlockHeader) verifyHeaderHash() bool {
+func (header *BlockHeader) verifyHash() bool {
 	tempHeader := &BlockHeader{
 		Id:         header.Id,
 		PrevHash:   header.PrevHash,
