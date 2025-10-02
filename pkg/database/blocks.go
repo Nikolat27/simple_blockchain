@@ -2,7 +2,6 @@ package database
 
 import (
 	"database/sql"
-	"log"
 )
 
 func (db *Database) AddBlock(sqlTx *sql.Tx, prevHash, hash, merkleRoot string, nonce, timestamp, blockHeight int64) (int64, error) {
@@ -52,7 +51,7 @@ func (db *Database) GetBlocksCount() (int64, error) {
 	return count, nil
 }
 
-func (db *Database) GetBlockById(blockId int64) *sql.Row {
+func (db *Database) GetBlockById(blockId int64) (*sql.Row, error) {
 	query := `
 		SELECT * FROM blocks WHERE block_height = ?
 	`
@@ -60,9 +59,11 @@ func (db *Database) GetBlockById(blockId int64) *sql.Row {
 	// Debug: check how many rows this would return
 	var count int
 	countQuery := `SELECT COUNT(*) FROM blocks WHERE block_height = ?`
-	db.db.QueryRow(countQuery, blockId).Scan(&count)
-	log.Printf("DEBUG: GetBlockById(%d) found %d rows", blockId, count)
+
+	if err := db.db.QueryRow(countQuery, blockId).Scan(&count); err != nil {
+		return nil, err
+	}
 
 	row := db.db.QueryRow(query, blockId)
-	return row
+	return row, nil
 }
