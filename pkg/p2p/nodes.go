@@ -10,6 +10,7 @@ import (
 	"simple_blockchain/pkg/blockchain"
 	"simple_blockchain/pkg/p2p/resolver"
 	"simple_blockchain/pkg/p2p/types"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,8 @@ type Node struct {
 
 	Blockchain *blockchain.Blockchain `json:"blockchain"`
 	payloadCh  chan types.Payload     // Communication channel
+
+	mutex sync.RWMutex
 }
 
 // SetupNode -> Node
@@ -49,7 +52,7 @@ func (node *Node) Bootstrap() {
 	seedPeers := resolver.ResolveSeedNodes()
 
 	for _, peer := range seedPeers {
-		if peer == node.GetCurrentAddress() {
+		if peer == node.GetCurrentTcpAddress() {
 			continue
 		}
 
@@ -65,7 +68,7 @@ func (node *Node) Bootstrap() {
 }
 
 func (node *Node) ConnectAndSync(ctx context.Context, peerAddress string) error {
-	msg := types.NewMessage(types.RequestHeadersMsg, node.GetCurrentAddress(), types.Payload{})
+	msg := types.NewMessage(types.RequestHeadersMsg, node.GetCurrentTcpAddress(), types.Payload{})
 	if err := node.WriteMessage(ctx, peerAddress, msg.Marshal()); err != nil {
 		return err
 	}
@@ -96,15 +99,13 @@ func (node *Node) ConnectAndSync(ctx context.Context, peerAddress string) error 
 	}
 }
 
-func (node *Node) DownloadMissingBlocks(ctx context.Context, peerAddress string, headers []blockchain.BlockHeader) error {
-	log.Printf("DEBUG: DownloadMissingBlocks received %d headers", len(headers))
+func (node *Node) DownloadMissingBlocks(ctx context.Context, peerAddress string,
+	headers []blockchain.BlockHeader) error {
 
 	localBlocks, err := node.Blockchain.GetAllBlocks()
 	if err != nil {
 		return err
 	}
-
-	log.Printf("DEBUG: Local blockchain has %d blocks", len(localBlocks))
 
 	localBlockIds := make(map[int64]bool)
 	for _, block := range localBlocks {
@@ -113,18 +114,16 @@ func (node *Node) DownloadMissingBlocks(ctx context.Context, peerAddress string,
 
 	downloaded := 0
 	for _, header := range headers {
-		if !localBlockIds[header.Id] {
-			log.Printf("DEBUG: Downloading missing block %d", header.Id)
-			if err := node.downloadBlock(ctx, peerAddress, header.Id); err != nil {
-				return fmt.Errorf("failed to download block %d: %w", header.Id, err)
-			}
-			downloaded++
-		} else {
-			log.Printf("DEBUG: Block %d already exists locally", header.Id)
+		if localBlockIds[header.Id] {
+			continue
 		}
+
+		if err := node.downloadBlock(ctx, peerAddress, header.Id); err != nil {
+			return fmt.Errorf("failed to download block %d: %w", header.Id, err)
+		}
+		downloaded++
 	}
 
-	log.Printf("DEBUG: Downloaded %d blocks during sync", downloaded)
 	return nil
 }
 
@@ -134,7 +133,7 @@ func (node *Node) downloadBlock(ctx context.Context, peerAddress string, blockId
 		return err
 	}
 
-	msg := types.NewMessage(types.RequestBlockMsg, node.GetCurrentAddress(), payload)
+	msg := types.NewMessage(types.RequestBlockMsg, node.GetCurrentTcpAddress(), payload)
 	if err := node.WriteMessage(ctx, peerAddress, msg.Marshal()); err != nil {
 		return err
 	}
@@ -163,17 +162,11 @@ func (node *Node) downloadBlock(ctx context.Context, peerAddress string, blockId
 			return err
 		}
 
-		if err := node.Blockchain.UpdateUserBalances(sqlTx, block.Transactions); err != nil {
-			return err
-		}
-
 		if err := sqlTx.Commit(); err != nil {
 			return err
 		}
 
-		node.Blockchain.Mutex.Lock()
-		node.Blockchain.Blocks = append(node.Blockchain.Blocks, block)
-		node.Blockchain.Mutex.Unlock()
+		node.Blockchain.AddBlockToMemory(&block)
 
 		return nil
 	}
@@ -194,15 +187,13 @@ func (node *Node) startListening(tcpListener net.Listener) error {
 func (node *Node) handleListening(conn net.Conn) {
 	defer conn.Close()
 
-	log.Printf("New connection from: %s", conn.RemoteAddr().String())
-
 	data, err := io.ReadAll(conn)
 	if err != nil {
 		log.Println(err)
 	}
 
 	if err := node.parseMessage(data); err != nil {
-		log.Println("ERROR parsing message: ", err)
+		log.Println("parsing message: ", err)
 	}
 }
 
@@ -235,10 +226,15 @@ func (node *Node) BroadcastBlock(block *blockchain.Block) error {
 		return fmt.Errorf("failed to marshal block: %w", err)
 	}
 
-	msg := types.NewMessage(types.BroadcastBlockMsg, node.GetCurrentAddress(), payload)
+	msg := types.NewMessage(types.BroadcastBlockMsg, node.GetCurrentTcpAddress(), payload)
 
-	fmt.Println(node.Peers)
+	fmt.Println("available peers: ", node.Peers)
+
 	for _, peerAddr := range node.Peers {
+		if peerAddr == node.GetCurrentTcpAddress() {
+			continue
+		}
+
 		go func(addr string) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
@@ -252,6 +248,6 @@ func (node *Node) BroadcastBlock(block *blockchain.Block) error {
 	return nil
 }
 
-func (node *Node) GetCurrentAddress() string {
+func (node *Node) GetCurrentTcpAddress() string {
 	return "127.0.0.1" + node.TcpAddress
 }
