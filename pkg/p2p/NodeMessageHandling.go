@@ -134,9 +134,14 @@ func (node *Node) AddNewPeer(newPeerAddress string) error {
 		return err
 	}
 
-	node.mutex.Lock()
-	node.Peers = append(node.Peers, newPeerAddress)
-	node.mutex.Unlock()
+	node.addPeerToMemory(newPeerAddress)
 
 	return nil
+}
+
+func (node *Node) addPeerToMemory(newPeer string) {
+	node.mutex.Lock()
+	defer node.mutex.Unlock()
+
+	node.Peers = append(node.Peers, newPeer)
 }

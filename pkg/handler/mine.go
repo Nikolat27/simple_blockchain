@@ -17,8 +17,8 @@ func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	minedBlock, err := handler.Node.Blockchain.MineBlock(ctx,
-		handler.Node.Blockchain.Mempool, input.MinerAddress)
+	minedBlock, err := handler.Node.Blockchain.MineBlock(ctx, handler.Node.Blockchain.Mempool,
+		input.MinerAddress)
 
 	if err != nil {
 		utils.WriteJSON(w, http.StatusBadRequest, err)

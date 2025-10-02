@@ -390,7 +390,6 @@ func (bc *Blockchain) VerifyHeaders(headers []BlockHeader) (bool, error) {
 	}
 
 	for idx, header := range headers {
-
 		var prevHash []byte
 		if idx > 0 {
 			prevHash = headers[idx-1].Hash
