@@ -16,6 +16,7 @@ import (
 func main() {
 	httpPort := flag.String("port", "8000", "http port")
 	tcpPort := flag.String("node-port", "8080", "tcp port")
+	dbDSN := flag.String("dsn", "blockchain_db.sqlite", "database data source name")
 
 	flag.Parse()
 
@@ -28,6 +29,7 @@ func main() {
 	dbDriverName := os.Getenv("DB_DRIVER_NAME")
 	dataSourceName := os.Getenv("DATA_SOURCE_NAME")
 
+	dataSourceName = *dbDSN
 	dbInstance, err := database.New(dbDriverName, dataSourceName)
 	if err != nil {
 		panic(err)
