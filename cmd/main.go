@@ -27,9 +27,8 @@ func main() {
 	}
 
 	dbDriverName := os.Getenv("DB_DRIVER_NAME")
-	dataSourceName := os.Getenv("DATA_SOURCE_NAME")
+	dataSourceName := *dbDSN
 
-	dataSourceName = *dbDSN
 	dbInstance, err := database.New(dbDriverName, dataSourceName)
 	if err != nil {
 		panic(err)
