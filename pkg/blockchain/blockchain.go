@@ -13,14 +13,14 @@ import (
 )
 
 const MiningReward = 10000
-const Difficulty = 5
+const Difficulty = 6
 
 type Blockchain struct {
-	Blocks []Block `json:"blocks"`
-	Mutex  sync.RWMutex
-
+	Blocks   []Block `json:"blocks"`
 	Database *database.Database
 	Mempool  *Mempool `json:"mempool"`
+
+	Mutex sync.RWMutex
 }
 
 func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
@@ -121,6 +121,7 @@ func startFresh(db *database.Database) (*Blockchain, error) {
 	return &Blockchain{
 		Blocks:   make([]Block, 0),
 		Database: db,
+		Mempool:  NewMempool(),
 	}, nil
 }
 
@@ -276,7 +277,7 @@ func (bc *Blockchain) VerifyBlock(block *Block) (bool, error) {
 }
 
 func (bc *Blockchain) GetBalance(address string) (uint64, error) {
-	mempoolTxs := bc.Mempool.GetTransactions()
+	mempoolTxs := bc.Mempool.GetTransactionsCopy()
 
 	confirmedBalance, err := bc.Database.GetConfirmedBalance(address)
 	if err != nil {
