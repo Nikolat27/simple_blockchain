@@ -68,6 +68,28 @@ func (tx *Transaction) Verify() bool {
 	return CryptoGraphy.VerifySignature(tx.PublicKey, hash, tx.Signature)
 }
 
+func (tx *Transaction) Size() int {
+	size := 0
+
+	// Strings: number of bytes in UTF-8 encoding
+	size += len(tx.From)
+	size += len(tx.To)
+	size += len(tx.PublicKey)
+
+	// Fixed-size fields
+	size += 8 // Amount (uint64)
+	size += 8 // Timestamp (int64)
+	size += 4 // Fee (uint32)
+
+	size += len(tx.Signature) // signature bytes
+
+	// Bool and Status string
+	size += 1 // IsCoinbase bool
+	size += len(tx.Status)
+
+	return size
+}
+
 func createCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
 	return &Transaction{
 		To:         minerAddress,

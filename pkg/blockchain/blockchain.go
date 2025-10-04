@@ -125,7 +125,7 @@ func startFresh(db *database.Database) (*Blockchain, error) {
 	return &Blockchain{
 		Blocks:   make([]Block, 0),
 		Database: db,
-		Mempool:  NewMempool(),
+		Mempool:  NewMempool(1048576),
 	}, nil
 }
 

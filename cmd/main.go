@@ -35,7 +35,7 @@ func main() {
 	}
 	defer dbInstance.Close()
 
-	mempool := blockchain.NewMempool()
+	mempool := blockchain.NewMempool(1048576)
 
 	// Load or initialize blockchain
 	bc, err := blockchain.LoadBlockchain(dbInstance, mempool)
