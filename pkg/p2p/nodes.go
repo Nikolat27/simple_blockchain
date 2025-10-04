@@ -247,6 +247,9 @@ func (node *Node) BroadcastMempool(mempool *blockchain.Mempool) error {
 }
 
 func (node *Node) sendToAllPeers(newMessage []byte) {
+	node.mutex.Lock()
+	defer node.mutex.Unlock()
+
 	fmt.Println("available peers: ", node.Peers)
 
 	for _, peerAddr := range node.Peers {
