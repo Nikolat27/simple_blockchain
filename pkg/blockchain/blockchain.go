@@ -31,7 +31,7 @@ func initBlockchain(db *database.Database, mp *Mempool) *Blockchain {
 		Database: db,
 		Mempool:  mp,
 
-		CancelMiningCh: make(chan bool),
+		CancelMiningCh: make(chan bool, 1),
 	}
 }
 
