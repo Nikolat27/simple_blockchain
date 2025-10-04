@@ -39,7 +39,10 @@ func (node *Node) parseMessage(senderMsg []byte) error {
 		node.payloadCh <- msg.Payload
 
 	case types.BlockBroadcastMsg:
-		return node.handleBroadcastBlock(msg.Payload)
+		return node.handleBlockBroadcasting(msg.Payload)
+
+	case types.MempoolBroadcastMsg:
+		return node.handleMempoolBroadcasting(msg.Payload)
 
 	default:
 		fmt.Println("meow meow")

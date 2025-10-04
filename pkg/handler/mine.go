@@ -30,6 +30,13 @@ func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := handler.Node.BroadcastMempool(handler.Node.Blockchain.Mempool); err != nil {
+		utils.WriteJSON(w, http.StatusInternalServerError,
+			fmt.Errorf("failed to broadcast mempool: %v", err))
+
+		return
+	}
+
 	if err := handler.Node.BroadcastBlock(minedBlock); err != nil {
 		utils.WriteJSON(w, http.StatusInternalServerError,
 			fmt.Errorf("failed to broadcast block: %v", err))

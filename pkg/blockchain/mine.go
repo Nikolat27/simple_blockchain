@@ -17,11 +17,11 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 		transactions := mempool.GetTransactions()
 
 		// Priority based
-		bc.Mempool.SortTxsByFee(&transactions)
+		sortedTxs := bc.Mempool.SortTxsByFee(transactions)
 
 		coinBaseTx := createCoinbaseTx(minerAddress, MiningReward)
 
-		allTransactions := append([]Transaction{*coinBaseTx}, transactions...)
+		allTransactions := append([]Transaction{*coinBaseTx}, sortedTxs...)
 
 		bc.Mutex.RLock()
 		prevHash := getPreviousBlockHash(bc.Blocks)

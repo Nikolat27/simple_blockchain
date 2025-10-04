@@ -358,7 +358,7 @@ func (bc *Blockchain) ValidateTransaction(tx *Transaction) error {
 	return errors.New("balance is insufficient")
 }
 
-func getUserPendingOutgoing(address string, mempoolTxs []Transaction) uint64 {
+func getUserPendingOutgoing(address string, mempoolTxs map[string]Transaction) uint64 {
 	var pending uint64
 
 	for _, tx := range mempoolTxs {
@@ -472,19 +472,4 @@ func (bc *Blockchain) AddBlockToMemory(block *Block) bool {
 
 	bc.Blocks = append(bc.Blocks, *block)
 	return true
-}
-
-func (bc *Blockchain) SyncMempool(mempool *Mempool) {
-	bc.Mempool.Mutex.Lock()
-	defer bc.Mempool.Mutex.Unlock()
-
-	for idx, tx := range mempool.Transactions {
-		for _, existingTx := range bc.Mempool.Transactions {
-			if existingTx.
-		}
-
-		if _, exists := bc.Mempool.Transactions[idx]; !exists {
-			bc.Mempool.Transactions[idx] = tx
-		}
-	}
 }
