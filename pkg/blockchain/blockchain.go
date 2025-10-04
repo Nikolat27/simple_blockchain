@@ -172,9 +172,6 @@ func (bc *Blockchain) AddTransactionToDB(dbTx *sql.Tx, blockId int, txs []Transa
 }
 
 func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
-	bc.Mutex.RLock()
-	defer bc.Mutex.RUnlock()
-
 	rows, err := bc.Database.GetAllBlocks()
 	if err != nil {
 		return nil, err
