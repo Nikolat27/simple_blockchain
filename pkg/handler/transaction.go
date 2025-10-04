@@ -76,11 +76,12 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 	}
 
 	resp := map[string]any{
-		"message":    "Transaction added to mempool",
-		"amount":     input.Amount,         // Amount recipient receives
-		"fee":        txFee,                // Fee paid to miner
-		"total_cost": input.Amount + txFee, // Total cost to sender
-		"status":     "pending",
+		"transaction_hash": newTx.Hash().EncodeToString(),
+		"message":          "Transaction added to mempool",
+		"amount":           input.Amount,         // Amount recipient receives
+		"fee":              txFee,                // Fee paid to miner
+		"total_cost":       input.Amount + txFee, // Total cost to sender
+		"status":           "pending",
 	}
 
 	utils.WriteJSON(w, http.StatusOK, resp)
