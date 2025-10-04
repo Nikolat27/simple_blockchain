@@ -88,7 +88,7 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 }
 
 func (handler *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
-	transactions := handler.Node.Blockchain.Mempool.GetTransactions()
+	transactions := handler.Node.Blockchain.Mempool.GetTransactionsCopy()
 
 	resp := map[string]any{
 		"transactions": transactions,
