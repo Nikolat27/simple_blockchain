@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"simple_blockchain/pkg/utils"
 	"sort"
-	"time"
 )
 
 func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddress string) (*Block, error) {
@@ -33,7 +33,7 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 			Id:           int64(blockIndex),
 			PrevHash:     prevHash,
 			Hash:         nil,
-			Timestamp:    time.Now().Unix(),
+			Timestamp:    utils.GetTimestamp(),
 			Transactions: allTransactions,
 			Nonce:        0,
 		}
@@ -51,7 +51,7 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 
 		bc.Mutex.RLock()
 		latestHash := getPreviousBlockHash(bc.Blocks)
-		bc.Mutex.Unlock()
+		bc.Mutex.RUnlock()
 
 		if !bytes.Equal(latestHash, newBlock.PrevHash) {
 			fmt.Println("Block was already mined by someone else")
