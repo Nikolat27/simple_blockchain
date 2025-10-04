@@ -38,8 +38,6 @@ func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
 	if err := handler.Node.CancelMining(); err != nil {
 		utils.WriteJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to broadcast block: %v", err))
 		return
-	} else {
-		fmt.Println("block mined successfully")
 	}
 
 	utils.WriteJSON(w, http.StatusOK, minedBlock)

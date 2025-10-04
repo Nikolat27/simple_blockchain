@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -45,6 +46,15 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 
 		if !mined {
 			fmt.Println("POW operation cancelled")
+			return nil, nil
+		}
+
+		bc.Mutex.RLock()
+		latestHash := getPreviousBlockHash(bc.Blocks)
+		bc.Mutex.Unlock()
+
+		if !bytes.Equal(latestHash, newBlock.PrevHash) {
+			fmt.Println("Block was already mined by someone else")
 			return nil, nil
 		}
 
