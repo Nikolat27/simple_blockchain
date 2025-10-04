@@ -274,7 +274,7 @@ func (bc *Blockchain) VerifyBlock(block *Block) (bool, error) {
 	}
 
 	if !bytes.Equal(prevBlock.Hash, tempBlock.PrevHash) {
-		return false, err
+		return false, fmt.Errorf("previous block hash mismatch for block %d", block.Id)
 	}
 
 	return hashMatches && tempBlock.IsValidHash(), nil
