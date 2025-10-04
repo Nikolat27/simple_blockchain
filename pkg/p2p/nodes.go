@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -96,6 +97,8 @@ func (node *Node) ConnectAndSync(ctx context.Context, peerAddress string) error 
 
 		fmt.Printf("Successfully synced %d blocks with peer: %s\n", len(headers), peerAddress)
 		return node.AddNewPeer(peerAddress)
+	case <-time.After(60 * time.Second):
+		return errors.New("ERROR get payload Timeout exceeded")
 	}
 }
 
@@ -169,6 +172,8 @@ func (node *Node) downloadBlock(ctx context.Context, peerAddress string, blockId
 		node.Blockchain.AddBlockToMemory(&block)
 
 		return nil
+		case <-time.After(60 * time.Second):
+			return errors.New("ERROR get block payload timeout exceeded")
 	}
 }
 

@@ -36,8 +36,9 @@ func (node *Node) handleGetBlockHeaders(requestorAddr string) error {
 		return err
 	}
 
-	msg := types.NewMessage(types.SendBlockHeadersMsg, node.GetCurrentTcpAddress(), payload)
-	return node.WriteMessage(ctx, requestorAddr, msg.Marshal())
+	newMessage := types.NewMessage(types.SendBlockHeadersMsg, node.GetCurrentTcpAddress(), payload)
+
+	return node.WriteMessage(ctx, requestorAddr, newMessage.Marshal())
 }
 
 func (node *Node) handleGetBlock(requestorAddr string, blockId int64) error {
