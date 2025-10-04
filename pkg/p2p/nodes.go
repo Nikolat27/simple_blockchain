@@ -22,7 +22,7 @@ type Node struct {
 	Blockchain *blockchain.Blockchain `json:"blockchain"`
 	payloadCh  chan types.Payload     // Communication channel
 
-	mutex sync.RWMutex
+	Mutex sync.RWMutex
 }
 
 // SetupNode -> Node
@@ -172,8 +172,8 @@ func (node *Node) downloadBlock(ctx context.Context, peerAddress string, blockId
 		node.Blockchain.AddBlockToMemory(&block)
 
 		return nil
-		case <-time.After(60 * time.Second):
-			return errors.New("ERROR get block payload timeout exceeded")
+	case <-time.After(60 * time.Second):
+		return errors.New("ERROR get block payload timeout exceeded")
 	}
 }
 
@@ -239,7 +239,7 @@ func (node *Node) BroadcastBlock(block *blockchain.Block) error {
 }
 
 func (node *Node) BroadcastMempool(mempool *blockchain.Mempool) error {
-	payload, err := json.Marshal(mempool)
+	var payload, err = json.Marshal(mempool)
 	if err != nil {
 		return fmt.Errorf("failed to marshal block: %w", err)
 	}
@@ -252,12 +252,11 @@ func (node *Node) BroadcastMempool(mempool *blockchain.Mempool) error {
 }
 
 func (node *Node) sendToAllPeers(newMessage []byte) {
-	node.mutex.Lock()
-	defer node.mutex.Unlock()
+	peersList := node.getPeersList()
 
 	fmt.Println("available peers: ", node.Peers)
 
-	for _, peerAddr := range node.Peers {
+	for _, peerAddr := range peersList {
 		if peerAddr == node.GetCurrentTcpAddress() {
 			continue
 		}
@@ -271,6 +270,17 @@ func (node *Node) sendToAllPeers(newMessage []byte) {
 			}
 		}(peerAddr)
 	}
+}
+
+func (node *Node) getPeersList() []string {
+	node.Mutex.RLock()
+
+	peersList := make([]string, len(node.Peers))
+	copy(peersList, node.Peers)
+
+	node.Mutex.RUnlock()
+
+	return peersList
 }
 
 func (node *Node) GetCurrentTcpAddress() string {
