@@ -133,11 +133,11 @@ func (node *Node) handleMempoolBroadcasting(payload types.Payload) error {
 }
 
 func (node *Node) AddNewPeer(newPeerAddress string) error {
-	node.mutex.RLock()
+	node.Mutex.RLock()
 	if slices.Contains(node.Peers, newPeerAddress) {
 		return nil
 	}
-	node.mutex.RUnlock()
+	node.Mutex.RUnlock()
 
 	sqlTx, err := node.Blockchain.Database.BeginTx()
 	if err != nil {
@@ -153,9 +153,9 @@ func (node *Node) AddNewPeer(newPeerAddress string) error {
 		return err
 	}
 
-	node.mutex.Lock()
+	node.Mutex.Lock()
 	node.addPeerToMemory(newPeerAddress)
-	node.mutex.Unlock()
+	node.Mutex.Unlock()
 
 	return nil
 }
