@@ -5,43 +5,23 @@ import (
 	"sync"
 )
 
-type School struct {
-	students []string
-	mutex sync.Mutex
-}
-
-func (sch *School) GetStudents() []string {
-	// Mutex lock here
-	sch.mutex.Lock()
-	defer sch.mutex.Unlock()
-
-	return sch.students
-}
-
-func (sch *School) GetStudentsUnlock() []string {
-	return sch.students
-}
-
-func SchoolCaller() {
-	var obj School
-	obj.mutex.Lock()
-	defer obj.mutex.Unlock()
-
-	// calling the locked function, which causes to deadlock
-	obj.GetStudents()
-}
-
 type Mempool struct {
 	Transactions map[string]Transaction `json:"transactions"`
+	MaxCapacity  int64                  `json:"max_capacity"` // 1MB
 	Mutex        sync.RWMutex           `json:"-"`
 }
 
-const BaseTxFee = 25  // 0.25%
-const HighTxFee = 200 // 2%
+const BaseTxFee = 1
 
-func NewMempool() *Mempool {
+func NewMempool(maxCapacity int64) *Mempool {
+	// in bytes
+	if maxCapacity == 0 {
+		maxCapacity = 1048576 // 1 MegaByte
+	}
+
 	return &Mempool{
 		Transactions: make(map[string]Transaction),
+		MaxCapacity:  maxCapacity,
 	}
 }
 
@@ -84,23 +64,30 @@ func (mp *Mempool) CalculateTxFee() uint64 {
 	mp.Mutex.RLock()
 	defer mp.Mutex.RUnlock()
 
-	if len(mp.Transactions) > 100 {
-		return HighTxFee
-	}
+	congestion := mp.GetCongestion()
 
-	return BaseTxFee
+	switch congestion {
+	case 0: // Low
+		return BaseTxFee
+	case 1: // Medium
+		return BaseTxFee * 2
+	case 2: // High
+		return BaseTxFee * 4
+	default:
+		return BaseTxFee
+	}
 }
 
-func (mp *Mempool) CalculateFee(amount uint64) uint64 {
-	txFee := mp.CalculateTxFee()
+func (mp *Mempool) CalculateFee(tx *Transaction) uint64 {
+	txFeeRate := mp.CalculateTxFee() // satoshis per byte
+	txSize := uint64(tx.Size())
 
-	feeAmount := (amount * txFee) / 10000
-
-	if feeAmount == 0 {
-		feeAmount = 1
+	// total fee = rate * size
+	fee := txFeeRate * txSize
+	if fee == 0 {
+		fee = 1
 	}
-
-	return feeAmount
+	return fee
 }
 
 func (mp *Mempool) SyncMempool(syncCandidateMempool *Mempool) {
@@ -145,5 +132,28 @@ func (mp *Mempool) DeleteMinedTransactions(blockTransactions []Transaction) {
 
 		hash := tx.Hash().EncodeToString()
 		delete(mp.Transactions, hash)
+	}
+}
+
+func (mp *Mempool) CalculateCurrentSize() int {
+	size := 0
+	for _, tx := range mp.Transactions {
+		size += tx.Size()
+	}
+	return size
+}
+
+// GetCongestion -> Low = 0, Medium = 1, High = 2
+func (mp *Mempool) GetCongestion() int {
+	currentSize := mp.CalculateCurrentSize()
+	ratio := float64(currentSize) / float64(mp.MaxCapacity)
+
+	switch {
+	case ratio < 0.25:
+		return 0 // Low
+	case ratio < 0.75:
+		return 1 // Medium
+	default:
+		return 2 // High
 	}
 }
