@@ -24,16 +24,22 @@ func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Cancelled or mined before
 	if minedBlock == nil {
-		utils.WriteJSON(w, http.StatusBadRequest, "No transactions to mine")
+		utils.WriteJSON(w, http.StatusConflict, "Transaction was either cancelled or already mined")
 		return
 	}
 
 	if err := handler.Node.BroadcastBlock(minedBlock); err != nil {
-		utils.WriteJSON(w, http.StatusInternalServerError,
-			fmt.Errorf("failed to broadcast block: %v", err))
-
+		utils.WriteJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to broadcast block: %v", err))
 		return
+	}
+
+	if err := handler.Node.CancelMining(); err != nil {
+		utils.WriteJSON(w, http.StatusInternalServerError, fmt.Errorf("failed to broadcast block: %v", err))
+		return
+	} else {
+		fmt.Println("block mined successfully")
 	}
 
 	utils.WriteJSON(w, http.StatusOK, minedBlock)

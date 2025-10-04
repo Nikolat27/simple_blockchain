@@ -225,6 +225,14 @@ func (node *Node) WriteMessage(ctx context.Context, peerAddress string, msg []by
 	return nil
 }
 
+func (node *Node) CancelMining() error {
+	newMessage := types.NewMessage(types.CancelMiningMsg, node.GetCurrentTcpAddress(), types.Payload{})
+
+	node.sendToAllPeers(newMessage.Marshal())
+
+	return nil
+}
+
 func (node *Node) BroadcastBlock(block *blockchain.Block) error {
 	payload, err := json.Marshal(block)
 	if err != nil {

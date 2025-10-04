@@ -14,19 +14,15 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 		fmt.Println("Mining cancelled")
 		return nil, nil
 	default:
-		// Get a snapshot of current mempool transactions
 		transactions := mempool.GetTransactionsCopy()
 
-		// Priority based - sort by fee (highest first)
+		// Priority based
 		sortedTxs := sortTxsByFee(transactions)
 
-		// Create coinbase transaction for miner reward
 		coinBaseTx := createCoinbaseTx(minerAddress, MiningReward)
 
-		// Build transaction list: coinbase first, then sorted transactions
 		allTransactions := append([]Transaction{*coinBaseTx}, sortedTxs...)
 
-		// Calculate block index and previous hash atomically
 		bc.Mutex.RLock()
 		prevHash := getPreviousBlockHash(bc.Blocks)
 		blockIndex := len(bc.Blocks)
@@ -42,7 +38,7 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 		}
 
 		// mining started...
-		mined, err := proofOfWork(ctx, newBlock)
+		mined, err := bc.proofOfWork(ctx, newBlock)
 		if err != nil {
 			return nil, fmt.Errorf("ERROR proofOfWork: %v", err)
 		}
@@ -77,11 +73,14 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 	}
 }
 
-func proofOfWork(ctx context.Context, block *Block) (bool, error) {
+func (bc *Blockchain) proofOfWork(ctx context.Context, block *Block) (bool, error) {
 	for {
 		select {
 		case <-ctx.Done():
 			// cancelled
+			return false, nil
+		case <-bc.CancelMiningCh:
+			// mined or cancelled
 			return false, nil
 		default:
 			if err := block.HashBlock(); err != nil {

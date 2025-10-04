@@ -20,15 +20,23 @@ type Blockchain struct {
 	Database *database.Database
 	Mempool  *Mempool `json:"mempool"`
 
+	CancelMiningCh chan bool
+
 	Mutex sync.RWMutex
 }
 
-func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
-	bc := &Blockchain{
+func initBlockchain(db *database.Database, mp *Mempool) *Blockchain {
+	return &Blockchain{
 		Blocks:   make([]Block, 0),
 		Database: db,
 		Mempool:  mp,
+
+		CancelMiningCh: make(chan bool),
 	}
+}
+
+func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
+	bc := initBlockchain(db, mp)
 
 	genesisBlock, err := createGenesisBlock()
 	if err != nil {
@@ -55,11 +63,7 @@ func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
 }
 
 func LoadBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
-	bc := &Blockchain{
-		Blocks:   make([]Block, 0),
-		Database: db,
-		Mempool:  mp,
-	}
+	bc := initBlockchain(db, mp)
 
 	blocks, err := bc.GetAllBlocks()
 	if err != nil {

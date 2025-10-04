@@ -132,6 +132,14 @@ func (node *Node) handleMempoolBroadcasting(payload types.Payload) error {
 	return nil
 }
 
+func (node *Node) handleCancelMining() error {
+	log.Println("handleCancelMining Current Node: ", node.GetCurrentTcpAddress())
+
+	node.Blockchain.CancelMiningCh <- true
+
+	return nil
+}
+
 func (node *Node) AddNewPeer(newPeerAddress string) error {
 	node.Mutex.RLock()
 	if slices.Contains(node.Peers, newPeerAddress) {
