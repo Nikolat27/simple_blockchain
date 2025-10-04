@@ -49,17 +49,6 @@ func (mp *Mempool) SortTxsByFee(txs map[string]Transaction) []Transaction {
 	return sortedTxs
 }
 
-func (mp *Mempool) Clear() {
-	mp.Mutex.Lock()
-	defer mp.Mutex.Unlock()
-
-	mp.Transactions = make(map[string]Transaction)
-}
-
-func (mp *Mempool) ClearUnlocked() {
-	mp.Transactions = make(map[string]Transaction)
-}
-
 func (mp *Mempool) CalculateTxFee() uint64 {
 	mp.Mutex.RLock()
 	defer mp.Mutex.RUnlock()
@@ -83,17 +72,6 @@ func (mp *Mempool) CalculateFee(amount uint64) uint64 {
 	return feeAmount
 }
 
-func (mp *Mempool) IsEmpty() bool {
-	mp.Mutex.Lock()
-	defer mp.Mutex.Unlock()
-
-	return len(mp.Transactions) == 0
-}
-
-func (mp *Mempool) IsEmptyUnlocked() bool {
-	return len(mp.Transactions) == 0
-}
-
 func (mp *Mempool) SyncMempool(syncCandidateMempool *Mempool) {
 	// Blockchain syncCandidateMempool
 	mp.Mutex.Lock()
@@ -102,8 +80,8 @@ func (mp *Mempool) SyncMempool(syncCandidateMempool *Mempool) {
 	syncCandidateMempool.Mutex.Lock()
 	defer syncCandidateMempool.Mutex.Unlock()
 
-	if syncCandidateMempool.IsEmptyUnlocked() {
-		mp.ClearUnlocked()
+	if syncCandidateMempool.IsEmpty() {
+		mp.Clear()
 		return
 	}
 
@@ -116,4 +94,12 @@ func (mp *Mempool) syncTransactions(newTxs map[string]Transaction) {
 			mp.Transactions[hash] = tx
 		}
 	}
+}
+
+func (mp *Mempool) IsEmpty() bool {
+	return len(mp.Transactions) == 0
+}
+
+func (mp *Mempool) Clear() {
+	mp.Transactions = make(map[string]Transaction)
 }
