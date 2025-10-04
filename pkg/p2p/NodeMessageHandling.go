@@ -78,14 +78,14 @@ func (node *Node) handleGetBlockchainData(requestorAddr string) error {
 	return node.WriteMessage(ctx, requestorAddr, msg.Marshal())
 }
 
-// handleBroadcastBlock -> Propose the new block
-func (node *Node) handleBroadcastBlock(payload types.Payload) error {
+// handleBlockBroadcasting -> Propose the new block
+func (node *Node) handleBlockBroadcasting(payload types.Payload) error {
 	var block blockchain.Block
 	if err := payload.Unmarshal(&block); err != nil {
 		return fmt.Errorf("failed to unmarshal broadcast block: %w", err)
 	}
 
-	fmt.Println("Current Node: ", node.GetCurrentTcpAddress())
+	log.Println("handleBlockBroadcasting Current Node: ", node.GetCurrentTcpAddress())
 
 	valid, err := node.Blockchain.VerifyBlock(&block)
 	if err != nil {
@@ -115,14 +115,16 @@ func (node *Node) handleBroadcastBlock(payload types.Payload) error {
 	return nil
 }
 
-// handleBroadcastMempool -> Propose the new mempool
-func (node *Node) handleBroadcastMempool(payload types.Payload) error {
-	var mempool blockchain.Mempool
-	if err := payload.Unmarshal(&mempool); err != nil {
+// handleMempoolBroadcasting -> Propose the new mempool
+func (node *Node) handleMempoolBroadcasting(payload types.Payload) error {
+	var newMempool blockchain.Mempool
+	if err := payload.Unmarshal(&newMempool); err != nil {
 		return fmt.Errorf("failed to unmarshal broadcast block: %w", err)
 	}
 
-	node.Blockchain.Mempool = &mempool
+	log.Println("handleMempoolBroadcasting Current Node: ", node.GetCurrentTcpAddress())
+
+	node.Blockchain.Mempool.SyncMempool(&newMempool)
 
 	return nil
 }

@@ -226,8 +226,27 @@ func (node *Node) BroadcastBlock(block *blockchain.Block) error {
 		return fmt.Errorf("failed to marshal block: %w", err)
 	}
 
-	msg := types.NewMessage(types.BlockBroadcastMsg, node.GetCurrentTcpAddress(), payload)
+	newMessage := types.NewMessage(types.BlockBroadcastMsg, node.GetCurrentTcpAddress(), payload)
 
+	node.sendToAllPeers(newMessage.Marshal())
+
+	return nil
+}
+
+func (node *Node) BroadcastMempool(mempool *blockchain.Mempool) error {
+	payload, err := json.Marshal(mempool)
+	if err != nil {
+		return fmt.Errorf("failed to marshal block: %w", err)
+	}
+
+	newMessage := types.NewMessage(types.MempoolBroadcastMsg, node.GetCurrentTcpAddress(), payload)
+
+	node.sendToAllPeers(newMessage.Marshal())
+
+	return nil
+}
+
+func (node *Node) sendToAllPeers(newMessage []byte) {
 	fmt.Println("available peers: ", node.Peers)
 
 	for _, peerAddr := range node.Peers {
@@ -239,13 +258,11 @@ func (node *Node) BroadcastBlock(block *blockchain.Block) error {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
-			if err := node.WriteMessage(ctx, addr, msg.Marshal()); err != nil {
+			if err := node.WriteMessage(ctx, addr, newMessage); err != nil {
 				log.Printf("Failed to broadcast block to %s: %v", addr, err)
 			}
 		}(peerAddr)
 	}
-
-	return nil
 }
 
 func (node *Node) GetCurrentTcpAddress() string {
