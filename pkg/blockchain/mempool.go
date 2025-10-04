@@ -28,11 +28,16 @@ func (mp *Mempool) AddTransaction(tx *Transaction) {
 	mp.Transactions[hash] = *tx
 }
 
-func (mp *Mempool) GetTransactions() map[string]Transaction {
+// GetTransactionsCopy returns a deep copy of mempool transactions (thread-safe)
+func (mp *Mempool) GetTransactionsCopy() map[string]Transaction {
 	mp.Mutex.RLock()
 	defer mp.Mutex.RUnlock()
 
-	return mp.Transactions
+	deelCopy := make(map[string]Transaction, len(mp.Transactions))
+	for k, v := range mp.Transactions {
+		deelCopy[k] = v
+	}
+	return deelCopy
 }
 
 // SortTxsByFee -> Sort transactions in DESC order by their fee
@@ -73,19 +78,17 @@ func (mp *Mempool) CalculateFee(amount uint64) uint64 {
 }
 
 func (mp *Mempool) SyncMempool(syncCandidateMempool *Mempool) {
-	// Blockchain syncCandidateMempool
+	candidateTxs := syncCandidateMempool.GetTransactionsCopy()
+
 	mp.Mutex.Lock()
 	defer mp.Mutex.Unlock()
 
-	syncCandidateMempool.Mutex.Lock()
-	defer syncCandidateMempool.Mutex.Unlock()
-
-	if syncCandidateMempool.IsEmpty() {
+	if len(candidateTxs) == 0 {
 		mp.Clear()
 		return
 	}
 
-	mp.syncTransactions(syncCandidateMempool.Transactions)
+	mp.syncTransactions(candidateTxs)
 }
 
 func (mp *Mempool) syncTransactions(newTxs map[string]Transaction) {
@@ -104,11 +107,17 @@ func (mp *Mempool) Clear() {
 	mp.Transactions = make(map[string]Transaction)
 }
 
-func (mp *Mempool) DeleteMinedTxs(minedTxs map[string]Transaction) {
+func (mp *Mempool) DeleteMinedTransactions(blockTransactions []Transaction) {
 	mp.Mutex.Lock()
 	defer mp.Mutex.Unlock()
 
-	for hash := range minedTxs {
+	for _, tx := range blockTransactions {
+		// Coinbase transaction are not in the mempool
+		if tx.IsCoinbase {
+			continue
+		}
+
+		hash := tx.Hash().EncodeToString()
 		delete(mp.Transactions, hash)
 	}
 }
