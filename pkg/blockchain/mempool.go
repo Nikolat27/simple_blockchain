@@ -7,7 +7,7 @@ import (
 
 type Mempool struct {
 	Transactions map[string]Transaction `json:"transactions"`
-	Mutex        sync.RWMutex
+	Mutex        sync.RWMutex           `json:"-"`
 }
 
 const BaseTxFee = 25  // 0.25%
@@ -35,17 +35,28 @@ func (mp *Mempool) GetTransactions() map[string]Transaction {
 	return mp.Transactions
 }
 
-// SortTxsByFee -> sort transactions in DESC order by their fee
-func (mp *Mempool) SortTxsByFee(txs *[]Transaction) {
-	sort.Slice(*txs, func(i, j int) bool {
-		return (*txs)[i].Fee > (*txs)[j].Fee
+// SortTxsByFee -> Sort transactions in DESC order by their fee
+func (mp *Mempool) SortTxsByFee(txs map[string]Transaction) []Transaction {
+	sortedTxs := make([]Transaction, 0, len(txs))
+	for _, tx := range txs {
+		sortedTxs = append(sortedTxs, tx)
+	}
+
+	sort.Slice(sortedTxs, func(i, j int) bool {
+		return sortedTxs[i].Fee > sortedTxs[j].Fee
 	})
+
+	return sortedTxs
 }
 
 func (mp *Mempool) Clear() {
 	mp.Mutex.Lock()
 	defer mp.Mutex.Unlock()
 
+	mp.Transactions = make(map[string]Transaction)
+}
+
+func (mp *Mempool) ClearUnlocked() {
 	mp.Transactions = make(map[string]Transaction)
 }
 
@@ -70,4 +81,39 @@ func (mp *Mempool) CalculateFee(amount uint64) uint64 {
 	}
 
 	return feeAmount
+}
+
+func (mp *Mempool) IsEmpty() bool {
+	mp.Mutex.Lock()
+	defer mp.Mutex.Unlock()
+
+	return len(mp.Transactions) == 0
+}
+
+func (mp *Mempool) IsEmptyUnlocked() bool {
+	return len(mp.Transactions) == 0
+}
+
+func (mp *Mempool) SyncMempool(syncCandidateMempool *Mempool) {
+	// Blockchain syncCandidateMempool
+	mp.Mutex.Lock()
+	defer mp.Mutex.Unlock()
+
+	syncCandidateMempool.Mutex.Lock()
+	defer syncCandidateMempool.Mutex.Unlock()
+
+	if syncCandidateMempool.IsEmptyUnlocked() {
+		mp.ClearUnlocked()
+		return
+	}
+
+	mp.syncTransactions(syncCandidateMempool.Transactions)
+}
+
+func (mp *Mempool) syncTransactions(newTxs map[string]Transaction) {
+	for hash, tx := range newTxs {
+		if _, exists := mp.Transactions[hash]; !exists {
+			mp.Transactions[hash] = tx
+		}
+	}
 }
