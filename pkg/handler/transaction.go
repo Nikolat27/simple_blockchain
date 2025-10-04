@@ -70,6 +70,11 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 
 	handler.Node.Blockchain.Mempool.AddTransaction(&newTx)
 
+	if err := handler.Node.BroadcastMempool(handler.Node.Blockchain.Mempool); err != nil {
+		utils.WriteJSON(w, http.StatusBadRequest, err)
+		return
+	}
+
 	resp := map[string]any{
 		"message":    "Transaction added to mempool",
 		"amount":     input.Amount,         // Amount recipient receives

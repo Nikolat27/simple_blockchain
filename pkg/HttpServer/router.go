@@ -15,6 +15,8 @@ func newRouter(handler *handler.Handler) *Router {
 
 	router.Route("/api", func(r chi.Router) {
 		r.Get("/chain", handler.GetBlockchain)
+		r.Get("/mempool", handler.GetMempool)
+
 		r.Post("/mine", handler.MineBlock)
 
 		r.Get("/balance", handler.GetBalance)
