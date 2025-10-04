@@ -113,6 +113,8 @@ func (node *Node) handleBlockBroadcasting(payload types.Payload) error {
 
 	node.Blockchain.AddBlockToMemory(&block)
 
+	node.Blockchain.Mempool.DeleteMinedTransactions(block.Transactions)
+
 	return nil
 }
 
@@ -135,7 +137,7 @@ func (node *Node) AddNewPeer(newPeerAddress string) error {
 	if slices.Contains(node.Peers, newPeerAddress) {
 		return nil
 	}
-	defer node.mutex.RUnlock()
+	node.mutex.RUnlock()
 
 	sqlTx, err := node.Blockchain.Database.BeginTx()
 	if err != nil {
