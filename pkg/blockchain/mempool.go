@@ -5,6 +5,32 @@ import (
 	"sync"
 )
 
+type School struct {
+	students []string
+	mutex sync.Mutex
+}
+
+func (sch *School) GetStudents() []string {
+	// Mutex lock here
+	sch.mutex.Lock()
+	defer sch.mutex.Unlock()
+
+	return sch.students
+}
+
+func (sch *School) GetStudentsUnlock() []string {
+	return sch.students
+}
+
+func SchoolCaller() {
+	var obj School
+	obj.mutex.Lock()
+	defer obj.mutex.Unlock()
+
+	// calling the locked function, which causes to deadlock
+	obj.GetStudents()
+}
+
 type Mempool struct {
 	Transactions map[string]Transaction `json:"transactions"`
 	Mutex        sync.RWMutex           `json:"-"`

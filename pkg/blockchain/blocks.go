@@ -7,8 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"simple_blockchain/pkg/database"
+	"simple_blockchain/pkg/utils"
 	"strings"
-	"time"
 )
 
 type Block struct {
@@ -165,7 +165,7 @@ func createGenesisBlock() (*Block, error) {
 	block := &Block{
 		Id:           0,
 		PrevHash:     make([]byte, 32),
-		Timestamp:    time.Now().Unix(),
+		Timestamp:    utils.GetTimestamp(),
 		Transactions: []Transaction{},
 		Nonce:        0,
 	}

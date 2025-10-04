@@ -5,7 +5,6 @@ import (
 	"simple_blockchain/pkg/CryptoGraphy"
 	"simple_blockchain/pkg/blockchain"
 	"simple_blockchain/pkg/utils"
-	"time"
 )
 
 func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +34,7 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 		Amount:     input.Amount, // Full amount recipient receives
 		Fee:        txFee,        // Fee paid to miner
 		Status:     "pending",
-		Timestamp:  time.Now().UTC().Unix(),
+		Timestamp:  utils.GetTimestamp(),
 		IsCoinbase: false,
 	}
 
