@@ -65,7 +65,7 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 
 		bc.AddBlockToMemory(newBlock)
 
-		mempool.Clear()
+		mempool.DeleteMinedTxs(transactions)
 
 		log.Println("Mined a block")
 

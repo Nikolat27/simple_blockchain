@@ -103,3 +103,12 @@ func (mp *Mempool) IsEmpty() bool {
 func (mp *Mempool) Clear() {
 	mp.Transactions = make(map[string]Transaction)
 }
+
+func (mp *Mempool) DeleteMinedTxs(minedTxs map[string]Transaction) {
+	mp.Mutex.Lock()
+	defer mp.Mutex.Unlock()
+
+	for hash := range minedTxs {
+		delete(mp.Transactions, hash)
+	}
+}
