@@ -4,25 +4,29 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"time"
 )
 
 func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddress string) (*Block, error) {
-	// Continuously mines new blocks until the operation is cancelled
 	select {
 	case <-ctx.Done():
 		fmt.Println("Mining cancelled")
 		return nil, nil
 	default:
-		transactions := mempool.GetTransactions()
+		// Get a snapshot of current mempool transactions
+		transactions := mempool.GetTransactionsCopy()
 
-		// Priority based
-		sortedTxs := bc.Mempool.SortTxsByFee(transactions)
+		// Priority based - sort by fee (highest first)
+		sortedTxs := sortTxsByFee(transactions)
 
+		// Create coinbase transaction for miner reward
 		coinBaseTx := createCoinbaseTx(minerAddress, MiningReward)
 
+		// Build transaction list: coinbase first, then sorted transactions
 		allTransactions := append([]Transaction{*coinBaseTx}, sortedTxs...)
 
+		// Calculate block index and previous hash atomically
 		bc.Mutex.RLock()
 		prevHash := getPreviousBlockHash(bc.Blocks)
 		blockIndex := len(bc.Blocks)
@@ -65,7 +69,7 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 
 		bc.AddBlockToMemory(newBlock)
 
-		mempool.DeleteMinedTxs(transactions)
+		mempool.DeleteMinedTransactions(newBlock.Transactions)
 
 		log.Println("Mined a block")
 
@@ -102,4 +106,18 @@ func getPreviousBlockHash(blocks []Block) []byte {
 	}
 
 	return prevHash
+}
+
+// sortTxsByFee sorts transactions in descending order by their fee
+func sortTxsByFee(txs map[string]Transaction) []Transaction {
+	sortedTxs := make([]Transaction, 0, len(txs))
+	for _, tx := range txs {
+		sortedTxs = append(sortedTxs, tx)
+	}
+
+	sort.Slice(sortedTxs, func(i, j int) bool {
+		return sortedTxs[i].Fee > sortedTxs[j].Fee
+	})
+
+	return sortedTxs
 }

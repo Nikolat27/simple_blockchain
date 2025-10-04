@@ -17,8 +17,7 @@ func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	minedBlock, err := handler.Node.Blockchain.MineBlock(ctx, handler.Node.Blockchain.Mempool,
-		input.MinerAddress)
+	minedBlock, err := handler.Node.Blockchain.MineBlock(ctx, handler.Node.Blockchain.Mempool, input.MinerAddress)
 
 	if err != nil {
 		utils.WriteJSON(w, http.StatusBadRequest, err)
@@ -27,13 +26,6 @@ func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
 
 	if minedBlock == nil {
 		utils.WriteJSON(w, http.StatusBadRequest, "No transactions to mine")
-		return
-	}
-
-	if err := handler.Node.BroadcastMempool(handler.Node.Blockchain.Mempool); err != nil {
-		utils.WriteJSON(w, http.StatusInternalServerError,
-			fmt.Errorf("failed to broadcast mempool: %v", err))
-
 		return
 	}
 
