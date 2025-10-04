@@ -102,9 +102,7 @@ func (node *Node) ConnectAndSync(ctx context.Context, peerAddress string) error 
 	}
 }
 
-func (node *Node) DownloadMissingBlocks(ctx context.Context, peerAddress string,
-	headers []blockchain.BlockHeader) error {
-
+func (node *Node) DownloadMissingBlocks(ctx context.Context, peerAddress string, headers []blockchain.BlockHeader) error {
 	localBlocks, err := node.Blockchain.GetAllBlocks()
 	if err != nil {
 		return err
@@ -152,6 +150,19 @@ func (node *Node) downloadBlock(ctx context.Context, peerAddress string, blockId
 
 		if block.Id != blockId {
 			return fmt.Errorf("received block ID mismatch: expected %d, got %d", blockId, block.Id)
+		}
+
+		valid, err := node.Blockchain.VerifyBlock(&block)
+		if err != nil {
+			return err
+		}
+
+		if !valid {
+			return fmt.Errorf("received invalid block %d", blockId)
+		}
+
+		if err := node.verifyBlockTransactions(&block); err != nil {
+			return fmt.Errorf("block %d contains invalid transactions: %w", blockId, err)
 		}
 
 		sqlTx, err := node.Blockchain.Database.BeginTx()

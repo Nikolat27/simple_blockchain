@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"simple_blockchain/pkg/CryptoGraphy"
 	"simple_blockchain/pkg/blockchain"
 	"simple_blockchain/pkg/p2p/types"
 	"slices"
@@ -79,6 +80,37 @@ func (node *Node) handleGetBlockchainData(requestorAddr string) error {
 	return node.WriteMessage(ctx, requestorAddr, msg.Marshal())
 }
 
+func (node *Node) verifyBlockTransactions(block *blockchain.Block) error {
+	for _, tx := range block.Transactions {
+		if tx.IsCoinbase {
+			continue
+		}
+
+		if !tx.Verify() {
+			return fmt.Errorf("transaction %x has invalid signature", tx.Hash())
+		}
+
+		derivedAddress, err := CryptoGraphy.DeriveAddressFromPublicKey(tx.PublicKey)
+		if err != nil {
+			return err
+		}
+
+		if derivedAddress != tx.From {
+			return fmt.Errorf("transaction %x sender address mismatch", tx.Hash())
+		}
+
+		if tx.Amount == 0 {
+			return fmt.Errorf("transaction %x has zero amount", tx.Hash())
+		}
+
+		if tx.Amount+tx.Fee <= 0 {
+			return fmt.Errorf("transaction %x has invalid amount/fee combination", tx.Hash())
+		}
+	}
+
+	return nil
+}
+
 // handleBlockBroadcasting -> Propose the new block
 func (node *Node) handleBlockBroadcasting(payload types.Payload) error {
 	var block blockchain.Block
@@ -95,6 +127,10 @@ func (node *Node) handleBlockBroadcasting(payload types.Payload) error {
 
 	if !valid {
 		return errors.New("block is corrupted")
+	}
+
+	if err := node.verifyBlockTransactions(&block); err != nil {
+		return fmt.Errorf("block contains invalid transactions: %w", err)
 	}
 
 	sqlTx, err := node.Blockchain.Database.BeginTx()
