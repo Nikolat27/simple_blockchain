@@ -43,7 +43,7 @@ func TestAddTxMempool(t *testing.T) {
 	}
 }
 
-func createMockTransaction(from, to string, amount uint64) *blockchain.Transaction {
+func createMockMempoolTransaction(from, to string, amount uint64) *blockchain.Transaction {
 	return blockchain.NewTransaction(from, to, amount, time.Now().UTC().UnixMilli())
 }
 
@@ -70,7 +70,7 @@ func TestNewMempool(t *testing.T) {
 
 func TestAddTransactionToMempool(t *testing.T) {
 	mp := blockchain.NewMempool(1000000)
-	tx := createMockTransaction("Alice", "Bob", 100)
+	tx := createMockMempoolTransaction("Alice", "Bob", 100)
 
 	mp.AddTransaction(tx)
 	hash := tx.Hash().EncodeToString()
@@ -86,7 +86,7 @@ func TestAddTransactionToMempool(t *testing.T) {
 
 func TestRemoveTransactionFromMempool(t *testing.T) {
 	mp := blockchain.NewMempool(1000000)
-	tx := createMockTransaction("Alice", "Bob", 100)
+	tx := createMockMempoolTransaction("Alice", "Bob", 100)
 
 	mp.AddTransaction(tx)
 	hash := tx.Hash().EncodeToString()
@@ -104,9 +104,9 @@ func TestRemoveTransactionFromMempool(t *testing.T) {
 
 func TestMempoolCapacityLimit(t *testing.T) {
 	// Create transactions first to calculate their sizes
-	tx1 := createMockTransaction("Alice", "Bob", 100)
-	tx2 := createMockTransaction("Bob", "Charlie", 200)
-	tx3 := createMockTransaction("Charlie", "Dave", 300)
+	tx1 := createMockMempoolTransaction("Alice", "Bob", 100)
+	tx2 := createMockMempoolTransaction("Bob", "Charlie", 200)
+	tx3 := createMockMempoolTransaction("Charlie", "Dave", 300)
 
 	// Calculate sizes
 	tx1Size := tx1.Size()
@@ -147,7 +147,7 @@ func TestMempoolCapacityLimit(t *testing.T) {
 
 func TestGetTransactionByHash(t *testing.T) {
 	mp := blockchain.NewMempool(1000000)
-	tx := createMockTransaction("Alice", "Bob", 100)
+	tx := createMockMempoolTransaction("Alice", "Bob", 100)
 
 	mp.AddTransaction(tx)
 	hash := tx.Hash().EncodeToString()
@@ -165,8 +165,8 @@ func TestGetTransactionByHash(t *testing.T) {
 func TestMempoolClear(t *testing.T) {
 	mp := blockchain.NewMempool(1000000)
 
-	tx1 := createMockTransaction("Alice", "Bob", 100)
-	tx2 := createMockTransaction("Bob", "Charlie", 200)
+	tx1 := createMockMempoolTransaction("Alice", "Bob", 100)
+	tx2 := createMockMempoolTransaction("Bob", "Charlie", 200)
 
 	mp.AddTransaction(tx1)
 	mp.AddTransaction(tx2)
@@ -180,7 +180,7 @@ func TestMempoolClear(t *testing.T) {
 
 func TestAddDuplicateTransaction(t *testing.T) {
 	mp := blockchain.NewMempool(1000000)
-	tx := createMockTransaction("Alice", "Bob", 100)
+	tx := createMockMempoolTransaction("Alice", "Bob", 100)
 
 	mp.AddTransaction(tx)
 	mp.AddTransaction(tx) // Add same transaction twice
@@ -209,8 +209,8 @@ func TestCalculateCurrentSize(t *testing.T) {
 		t.Error("Empty mempool should have size 0")
 	}
 
-	tx1 := createMockTransaction("Alice", "Bob", 100)
-	tx2 := createMockTransaction("Bob", "Charlie", 200)
+	tx1 := createMockMempoolTransaction("Alice", "Bob", 100)
+	tx2 := createMockMempoolTransaction("Bob", "Charlie", 200)
 
 	mp.AddTransaction(tx1)
 	size1 := mp.CalculateCurrentSize()
@@ -239,8 +239,8 @@ func TestWillExceedCapacityNilTransaction(t *testing.T) {
 }
 
 func TestWillExceedCapacityEmptyMempool(t *testing.T) {
-	mp := blockchain.NewMempool(20) // Very small capacity
-	largeTx := createMockTransaction("Alice", "Bob", 999999) // Large transaction
+	mp := blockchain.NewMempool(20)                                 // Very small capacity
+	largeTx := createMockMempoolTransaction("Alice", "Bob", 999999) // Large transaction
 
 	if !mp.WillExceedCapacity(largeTx) {
 		t.Error("Large transaction should exceed capacity on empty mempool")
