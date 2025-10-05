@@ -1,6 +1,11 @@
 .env
 
 .idea
+.vscode/
 
 # SQLite database
 *.sqlite
+
+# Certificates
+cert.pem
+key.pem

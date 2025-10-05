@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,10 @@ import (
 	"testing"
 	"time"
 )
+
+func initTls() (*tls.Config, error) {
+	return utils.InitTLS("test_cert.pem", "test_key.pem")
+}
 
 // setupTestDatabase creates a temporary test database
 func setupTestDatabase(t *testing.T) (*database.Database, func()) {
@@ -99,7 +104,12 @@ func TestNode_GetCurrentTcpAddress(t *testing.T) {
 		t.Fatalf("Failed to create blockchain: %v", err)
 	}
 
-	node, err := p2p.SetupNode(":9000", bc)
+	tlsConfig, err := initTls()
+	if err != nil {
+		t.Fatalf("Failed to init tls: %v", err)
+	}
+
+	node, err := p2p.SetupNode(":9000", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup node: %v", err)
 	}
@@ -128,7 +138,12 @@ func TestNode_AddNewPeer(t *testing.T) {
 		t.Fatalf("Failed to create blockchain: %v", err)
 	}
 
-	node, err := p2p.SetupNode(":9001", bc)
+	tlsConfig, err := initTls()
+	if err != nil {
+		t.Fatalf("Failed to init tls: %v", err)
+	}
+
+	node, err := p2p.SetupNode(":9001", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup node: %v", err)
 	}
@@ -168,7 +183,12 @@ func TestNode_AddNewPeer_Duplicate(t *testing.T) {
 		t.Fatalf("Failed to create blockchain: %v", err)
 	}
 
-	node, err := p2p.SetupNode(":9003", bc)
+	tlsConfig, err := initTls()
+	if err != nil {
+		t.Fatalf("Failed to init tls: %v", err)
+	}
+
+	node, err := p2p.SetupNode(":9003", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup node: %v", err)
 	}
@@ -213,7 +233,12 @@ func TestNode_BroadcastBlock(t *testing.T) {
 		t.Fatalf("Failed to create blockchain: %v", err)
 	}
 
-	node, err := p2p.SetupNode(":9005", bc)
+	tlsConfig, err := initTls()
+	if err != nil {
+		t.Fatalf("Failed to init tls: %v", err)
+	}
+
+	node, err := p2p.SetupNode(":9005", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup node: %v", err)
 	}
@@ -253,7 +278,12 @@ func TestNode_BroadcastMempool(t *testing.T) {
 		t.Fatalf("Failed to create blockchain: %v", err)
 	}
 
-	node, err := p2p.SetupNode(":9006", bc)
+	tlsConfig, err := initTls()
+	if err != nil {
+		t.Fatalf("Failed to init tls: %v", err)
+	}
+
+	node, err := p2p.SetupNode(":9006", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup node: %v", err)
 	}
@@ -276,7 +306,12 @@ func TestNode_CancelMining(t *testing.T) {
 		t.Fatalf("Failed to create blockchain: %v", err)
 	}
 
-	node, err := p2p.SetupNode(":9007", bc)
+	tlsConfig, err := initTls()
+	if err != nil {
+		t.Fatalf("Failed to init tls: %v", err)
+	}
+
+	node, err := p2p.SetupNode(":9007", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup node: %v", err)
 	}
@@ -299,14 +334,19 @@ func TestNode_WriteMessage(t *testing.T) {
 		t.Fatalf("Failed to create blockchain: %v", err)
 	}
 
+	tlsConfig, err := initTls()
+	if err != nil {
+		t.Fatalf("Failed to init tls: %v", err)
+	}
+
 	// Setup receiver node
-	receiverNode, err := p2p.SetupNode(":9008", bc)
+	receiverNode, err := p2p.SetupNode(":9008", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup receiver node: %v", err)
 	}
 
 	// Setup sender node
-	senderNode, err := p2p.SetupNode(":9009", bc)
+	senderNode, err := p2p.SetupNode(":9009", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup sender node: %v", err)
 	}
@@ -338,7 +378,12 @@ func TestNode_WriteMessage_ContextCancellation(t *testing.T) {
 		t.Fatalf("Failed to create blockchain: %v", err)
 	}
 
-	node, err := p2p.SetupNode(":9010", bc)
+	tlsConfig, err := initTls()
+	if err != nil {
+		t.Fatalf("Failed to init tls: %v", err)
+	}
+
+	node, err := p2p.SetupNode(":9010", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup node: %v", err)
 	}
@@ -367,7 +412,12 @@ func TestNode_VerifyBlockTransactions(t *testing.T) {
 		t.Fatalf("Failed to create blockchain: %v", err)
 	}
 
-	_, err = p2p.SetupNode(":9011", bc)
+	tlsConfig, err := initTls()
+	if err != nil {
+		t.Fatalf("Failed to init tls: %v", err)
+	}
+
+	_, err = p2p.SetupNode(":9011", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup node: %v", err)
 	}
@@ -421,7 +471,12 @@ func TestNode_ConcurrentPeerAccess(t *testing.T) {
 		t.Fatalf("Failed to create blockchain: %v", err)
 	}
 
-	node, err := p2p.SetupNode(":9012", bc)
+	tlsConfig, err := initTls()
+	if err != nil {
+		t.Fatalf("Failed to init tls: %v", err)
+	}
+
+	node, err := p2p.SetupNode(":9012", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup node: %v", err)
 	}
@@ -462,7 +517,12 @@ func TestNode_MessageParsing(t *testing.T) {
 		t.Fatalf("Failed to create blockchain: %v", err)
 	}
 
-	_, err = p2p.SetupNode(":9013", bc)
+	tlsConfig, err := initTls()
+	if err != nil {
+		t.Fatalf("Failed to init tls: %v", err)
+	}
+
+	_, err = p2p.SetupNode(":9013", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup node: %v", err)
 	}
@@ -504,9 +564,14 @@ func TestNode_SetupMultipleNodes(t *testing.T) {
 			t.Fatalf("Failed to create blockchain %d: %v", i, err)
 		}
 
+		tlsConfig, err := initTls()
+		if err != nil {
+			t.Fatalf("Failed to init tls: %v", err)
+		}
+
 		port := 9100 + i
 		portStr := fmt.Sprintf(":%d", port)
-		node, err := p2p.SetupNode(portStr, bc)
+		node, err := p2p.SetupNode(portStr, bc, tlsConfig)
 		if err != nil {
 			t.Fatalf("Failed to setup node %d: %v", i, err)
 		}
@@ -537,7 +602,12 @@ func TestNode_BlockchainIntegration(t *testing.T) {
 		t.Fatalf("Failed to create blockchain: %v", err)
 	}
 
-	node, err := p2p.SetupNode(":9014", bc)
+	tlsConfig, err := initTls()
+	if err != nil {
+		t.Fatalf("Failed to init tls: %v", err)
+	}
+
+	node, err := p2p.SetupNode(":9014", bc, tlsConfig)
 	if err != nil {
 		t.Fatalf("Failed to setup node: %v", err)
 	}

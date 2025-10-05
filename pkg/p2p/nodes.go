@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,11 +24,17 @@ type Node struct {
 	payloadCh  chan types.Payload     // Communication channel
 
 	Mutex sync.RWMutex
+
+	TLSConfig *tls.Config
 }
 
 // SetupNode -> Node
-func SetupNode(address string, bc *blockchain.Blockchain) (*Node, error) {
-	tcpListener, err := net.Listen("tcp", address)
+func SetupNode(address string, bc *blockchain.Blockchain, tlsConfig *tls.Config) (*Node, error) {
+	if tlsConfig == nil {
+		return nil, errors.New("TLS config is empty, Peer connections must be encrypted")
+	}
+
+	tcpListener, err := tls.Listen("tcp", address, tlsConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -41,6 +48,8 @@ func SetupNode(address string, bc *blockchain.Blockchain) (*Node, error) {
 		Blockchain: bc,
 
 		payloadCh: make(chan types.Payload),
+
+		TLSConfig: tlsConfig,
 	}
 
 	go node.startListening(tcpListener)
@@ -199,7 +208,7 @@ func (node *Node) startListening(tcpListener net.Listener) error {
 	}
 }
 
-// handleListening -> Node must consistently listen (read) to the TCP connection
+// handleListening -> Node must consistently listen (read) to the TCP TLS connection
 func (node *Node) handleListening(conn net.Conn) {
 	defer conn.Close()
 
@@ -223,13 +232,16 @@ func (node *Node) WriteMessage(ctx context.Context, peerAddress string, msg []by
 	}
 	defer conn.Close()
 
+	tlsConn := tls.Client(conn, node.TLSConfig)
+	defer tlsConn.Close()
+
 	if deadline, ok := ctx.Deadline(); ok {
-		if err := conn.SetDeadline(deadline); err != nil {
+		if err := tlsConn.SetDeadline(deadline); err != nil {
 			return err
 		}
 	}
 
-	if _, err := conn.Write(msg); err != nil {
+	if _, err := tlsConn.Write(msg); err != nil {
 		return err
 	}
 

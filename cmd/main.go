@@ -50,8 +50,13 @@ func main() {
 		}
 	}
 
+	tlsConfig, err := utils.InitTLS("cert.pem", "key.pem")
+	if err != nil {
+		panic(err)
+	}
+
 	// Start node
-	node, err := p2p.SetupNode(peerAddress, bc)
+	node, err := p2p.SetupNode(peerAddress, bc, tlsConfig)
 	if err != nil {
 		panic(err)
 	}

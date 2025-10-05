@@ -61,25 +61,6 @@ func (node *Node) handleGetBlock(requestorAddr string, blockId int64) error {
 	return node.WriteMessage(ctx, requestorAddr, msg.Marshal())
 }
 
-func (node *Node) handleGetBlockchainData(requestorAddr string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	blocks, err := node.Blockchain.GetAllBlocks()
-	if err != nil {
-		return err
-	}
-
-	payload, err := json.Marshal(blocks)
-	if err != nil {
-		return err
-	}
-
-	msg := types.NewMessage(types.SendBlockHeadersMsg, node.GetCurrentTcpAddress(), payload)
-
-	return node.WriteMessage(ctx, requestorAddr, msg.Marshal())
-}
-
 func (node *Node) verifyBlockTransactions(block *blockchain.Block) error {
 	for _, tx := range block.Transactions {
 		if tx.IsCoinbase {
@@ -150,6 +131,8 @@ func (node *Node) handleBlockBroadcasting(payload types.Payload) error {
 	node.Blockchain.AddBlockToMemory(&block)
 
 	node.Blockchain.Mempool.DeleteMinedTransactions(block.Transactions)
+
+	log.Println("New block verified successfully")
 
 	return nil
 }
