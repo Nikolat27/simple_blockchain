@@ -242,3 +242,39 @@ func (header *BlockHeader) computeHeaderHash() []byte {
 	hash := sha256.Sum256([]byte(record))
 	return hash[:]
 }
+
+// AddTransaction -> It`s for unit tests
+func (block *Block) AddTransaction(tx Transaction) {
+	block.Transactions = append(block.Transactions, tx)
+	block.ComputeMerkleRoot()
+}
+
+func (block *Block) ValidateBlock(prevHash []byte) bool {
+	if len(block.PrevHash) != len(prevHash) {
+		return false
+	}
+	for i := range block.PrevHash {
+		if block.PrevHash[i] != prevHash[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (block *Block) CalculateSize() int64 {
+	size := int64(0)
+
+	size += 8 // Id (int64)
+	size += int64(len(block.Hash))
+	size += int64(len(block.PrevHash))
+	size += int64(len(block.MerkleRoot))
+	size += 8 // Timestamp (int64)
+	size += 8 // Nonce (int64)
+
+	for _, tx := range block.Transactions {
+		size += int64(tx.Size())
+	}
+
+	return size
+}
