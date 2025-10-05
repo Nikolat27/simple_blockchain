@@ -1,6 +1,7 @@
 .env
 
 .idea
+.vscode/
 
 # SQLite database
 *.sqlite
