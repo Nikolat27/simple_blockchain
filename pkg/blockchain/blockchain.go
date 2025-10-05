@@ -36,6 +36,10 @@ func initBlockchain(db *database.Database, mp *Mempool) *Blockchain {
 }
 
 func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
+	if mp == nil {
+		return nil, errors.New("mempool instance is required")
+	}
+
 	bc := initBlockchain(db, mp)
 
 	genesisBlock, err := createGenesisBlock()
@@ -288,19 +292,13 @@ func (bc *Blockchain) GetBalance(address string) (uint64, error) {
 		return 0, err
 	}
 
-	log.Println("Confirmed Balance: ", confirmedBalance)
-
 	pendingOutgoing := getUserPendingOutgoing(address, mempoolTxs)
-
-	log.Println("Pending outgoing: ", pendingOutgoing)
 
 	if confirmedBalance < pendingOutgoing {
 		return 0, nil
 	}
 
 	effectiveBalance := confirmedBalance - pendingOutgoing
-
-	log.Println("Effective balance: ", effectiveBalance)
 
 	return effectiveBalance, nil
 }
@@ -474,4 +472,15 @@ func (bc *Blockchain) AddBlockToMemory(block *Block) bool {
 
 	bc.Blocks = append(bc.Blocks, *block)
 	return true
+}
+
+func (bc *Blockchain) GetLatestBlock() *Block {
+	bc.Mutex.RLock()
+	defer bc.Mutex.RUnlock()
+
+	if len(bc.Blocks) == 0 {
+		return nil
+	}
+
+	return &bc.Blocks[len(bc.Blocks)-1]
 }
