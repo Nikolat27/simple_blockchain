@@ -4,3 +4,7 @@
 
 # SQLite database
 *.sqlite
+
+# Certificates
+cert.pem
+key.pem
