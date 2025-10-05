@@ -212,6 +212,10 @@ func (node *Node) startListening(tcpListener net.Listener) error {
 func (node *Node) handleListening(conn net.Conn) {
 	defer conn.Close()
 
+	if !isTLS(conn) {
+		log.Println("connection is not TLS")
+	}
+
 	data, err := io.ReadAll(conn)
 	if err != nil {
 		log.Println(err)
@@ -316,4 +320,9 @@ func (node *Node) getPeersList() []string {
 
 func (node *Node) GetCurrentTcpAddress() string {
 	return "127.0.0.1" + node.TcpAddress
+}
+
+func isTLS(conn net.Conn) bool {
+	_, ok := conn.(*tls.Conn)
+	return ok
 }

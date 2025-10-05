@@ -12,6 +12,6 @@ func InitTLS(certFile, keyFile string) (*tls.Config, error) {
 
 	return &tls.Config{
 		Certificates:       []tls.Certificate{cert},
-		InsecureSkipVerify: true, // Remove for production
+		InsecureSkipVerify: true,
 	}, nil
 }
