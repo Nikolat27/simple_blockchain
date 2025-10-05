@@ -15,8 +15,7 @@ func TestBlock_HashBlock(t *testing.T) {
 		Transactions: []blockchain.Transaction{},
 	}
 
-	err := block.HashBlock()
-	if err != nil {
+	if err := block.HashBlock(); err != nil {
 		t.Errorf("HashBlock failed: %v", err)
 	}
 
@@ -55,8 +54,7 @@ func TestBlock_ValidateBlock(t *testing.T) {
 	}
 
 	// Hash the block first
-	err := block.HashBlock()
-	if err != nil {
+	if err := block.HashBlock(); err != nil {
 		t.Fatalf("Failed to hash block: %v", err)
 	}
 
@@ -113,8 +111,7 @@ func TestBlock_MerkleRootCalculation(t *testing.T) {
 	}
 
 	// Test with no transactions
-	err := block.HashBlock()
-	if err != nil {
+	if err := block.HashBlock(); err != nil {
 		t.Fatalf("Failed to hash block: %v", err)
 	}
 
@@ -128,8 +125,7 @@ func TestBlock_MerkleRootCalculation(t *testing.T) {
 	block.AddTransaction(tx1)
 	block.AddTransaction(tx2)
 
-	err = block.HashBlock()
-	if err != nil {
+	if err := block.HashBlock(); err != nil {
 		t.Fatalf("Failed to hash block with transactions: %v", err)
 	}
 
@@ -187,8 +183,7 @@ func TestBlock_IsValidHash(t *testing.T) {
 	}
 
 	// Hash the block
-	err := block.HashBlock()
-	if err != nil {
+	if err := block.HashBlock(); err != nil {
 		t.Fatalf("Failed to hash block: %v", err)
 	}
 
@@ -279,16 +274,14 @@ func TestBlock_HashBlockConsistency(t *testing.T) {
 	}
 
 	// Hash the block twice
-	err := block.HashBlock()
-	if err != nil {
+	if err := block.HashBlock(); err != nil {
 		t.Fatalf("Failed to hash block: %v", err)
 	}
 
 	hash1 := make([]byte, len(block.Hash))
 	copy(hash1, block.Hash)
 
-	err = block.HashBlock()
-	if err != nil {
+	if err := block.HashBlock(); err != nil {
 		t.Fatalf("Failed to hash block second time: %v", err)
 	}
 
@@ -312,8 +305,7 @@ func TestBlock_ValidateBlockWithDifferentPrevHash(t *testing.T) {
 		block.PrevHash[i] = byte(i)
 	}
 
-	err := block.HashBlock()
-	if err != nil {
+	if err := block.HashBlock(); err != nil {
 		t.Fatalf("Failed to hash block: %v", err)
 	}
 
