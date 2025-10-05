@@ -15,7 +15,7 @@ const BaseTxFee = 10
 
 func NewMempool(maxCapacity int64) *Mempool {
 	// in bytes
-	if maxCapacity == 0 {
+	if maxCapacity < 1 {
 		maxCapacity = 1048576 // 1 MegaByte
 	}
 
@@ -26,6 +26,10 @@ func NewMempool(maxCapacity int64) *Mempool {
 }
 
 func (mp *Mempool) AddTransaction(tx *Transaction) {
+	if tx == nil {
+		return
+	}
+
 	mp.Mutex.Lock()
 	defer mp.Mutex.Unlock()
 
@@ -173,7 +177,7 @@ func (mp *Mempool) WillExceedCapacity(tx *Transaction) bool {
 		return false
 	}
 
-	currentSize := int64(mp.CalculateTxFee())
+	currentSize := int64(mp.CalculateCurrentSize())
 	txSize := int64(tx.Size())
 
 	if txSize < 0 {
@@ -182,4 +186,13 @@ func (mp *Mempool) WillExceedCapacity(tx *Transaction) bool {
 
 	newSize := currentSize + txSize
 	return newSize > mp.MaxCapacity
+}
+
+func (mp *Mempool) GetTransaction(hash string) (*Transaction, bool) {
+	tx, exists := mp.Transactions[hash]
+	return &tx, exists
+}
+
+func (mp *Mempool) RemoveTransaction(hash string) {
+	delete(mp.Transactions, hash)
 }
