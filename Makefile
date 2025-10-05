@@ -25,7 +25,7 @@ view-leveldb:
 	@leveldb-viewer -db balances
 
 reset-db:
-	rm -f blockchain_db.sqlite
+	sudo rm -f blockchain_db.sqlite
 
 migrations:
 	goose -dir migrations sqlite3 blockchain_db.sqlite up
