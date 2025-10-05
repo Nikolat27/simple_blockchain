@@ -123,3 +123,13 @@ func CreateCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
 		IsCoinbase: true,
 	}
 }
+
+func NewTransaction(from, to string, amount uint64, timestamp int64) *Transaction {
+	return &Transaction{
+		From:      from,
+		To:        to,
+		Amount:    amount,
+		Timestamp: timestamp,
+		Status:    "pending",
+	}
+}
