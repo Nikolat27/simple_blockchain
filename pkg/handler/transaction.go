@@ -39,6 +39,11 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 
 	newTx.Fee = txFee
 
+	if handler.Node.Blockchain.Mempool.WillExceedCapacity(&newTx) {
+		utils.WriteJSON(w, http.StatusBadRequest, "Mempool capacity exceeded. Try again later")
+		return
+	}
+
 	// Validate that the 'from' address matches the public key
 	derivedAddress, err := CryptoGraphy.DeriveAddressFromPublicKey(input.PublicKey)
 	if err != nil {

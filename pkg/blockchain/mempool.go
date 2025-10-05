@@ -158,3 +158,28 @@ func (mp *Mempool) GetCongestion() int {
 		return 2 // High
 	}
 }
+
+func (mp *Mempool) WillExceedCapacity(tx *Transaction) bool {
+	if tx == nil {
+		return false
+	}
+
+	mp.Mutex.RLock()
+	defer mp.Mutex.RUnlock()
+
+	hash := tx.Hash().EncodeToString()
+	if _, exists := mp.Transactions[hash]; exists {
+		// already exists -> won't exceed capacity
+		return false
+	}
+
+	currentSize := int64(mp.CalculateTxFee())
+	txSize := int64(tx.Size())
+
+	if txSize < 0 {
+		txSize = 0
+	}
+
+	newSize := currentSize + txSize
+	return newSize > mp.MaxCapacity
+}
