@@ -11,7 +11,7 @@ type Mempool struct {
 	Mutex        sync.RWMutex           `json:"-"`
 }
 
-const BaseTxFee = 1
+const BaseTxFee = 10
 
 func NewMempool(maxCapacity int64) *Mempool {
 	// in bytes
@@ -79,7 +79,7 @@ func (mp *Mempool) CalculateTxFee() uint64 {
 }
 
 func (mp *Mempool) CalculateFee(tx *Transaction) uint64 {
-	txFeeRate := mp.CalculateTxFee() // satoshis per byte
+	txFeeRate := mp.CalculateTxFee() // Satoshis per byte
 	txSize := uint64(tx.Size())
 
 	// total fee = rate * size
@@ -87,6 +87,7 @@ func (mp *Mempool) CalculateFee(tx *Transaction) uint64 {
 	if fee == 0 {
 		fee = 1
 	}
+
 	return fee
 }
 

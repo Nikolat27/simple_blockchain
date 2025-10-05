@@ -1,7 +1,9 @@
 package blockchain
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"simple_blockchain/pkg/CryptoGraphy"
@@ -69,25 +71,46 @@ func (tx *Transaction) Verify() bool {
 }
 
 func (tx *Transaction) Size() int {
-	size := 0
+	var buf bytes.Buffer
 
-	// Strings: number of bytes in UTF-8 encoding
-	size += len(tx.From)
-	size += len(tx.To)
-	size += len(tx.PublicKey)
+	writeBytes := func(b []byte) {
+		_ = binary.Write(&buf, binary.BigEndian, uint32(len(b)))
+		buf.Write(b)
+	}
+	writeString := func(s string) {
+		writeBytes([]byte(s))
+	}
 
-	// Fixed-size fields
-	size += 8 // Amount (uint64)
-	size += 8 // Timestamp (int64)
-	size += 4 // Fee (uint32)
+	// Variable-length strings (length-prefixed)
+	writeString(tx.From)
+	writeString(tx.To)
+	writeString(tx.PublicKey)
 
-	size += len(tx.Signature) // signature bytes
+	// Fixed-size numeric fields
+	_ = binary.Write(&buf, binary.BigEndian, tx.Amount)    // uint64
+	_ = binary.Write(&buf, binary.BigEndian, tx.Timestamp) // int64
 
-	// Bool and Status string
-	size += 1 // IsCoinbase bool
-	size += len(tx.Status)
+	// Signature: length-prefixed bytes
+	if tx.Signature != nil {
+		writeBytes(tx.Signature)
+	} else {
+		_ = binary.Write(&buf, binary.BigEndian, uint32(0))
+	}
 
-	return size
+	// Fee is uint64, write 8 bytes
+	_ = binary.Write(&buf, binary.BigEndian, tx.Fee)
+
+	// Status string
+	writeString(tx.Status)
+
+	// Bool as single byte
+	if tx.IsCoinbase {
+		buf.WriteByte(1)
+	} else {
+		buf.WriteByte(0)
+	}
+
+	return buf.Len()
 }
 
 func createCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {

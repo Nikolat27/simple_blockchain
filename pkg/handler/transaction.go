@@ -26,17 +26,18 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	txFee := handler.Node.Blockchain.Mempool.CalculateFee(input.Amount)
-
 	newTx := blockchain.Transaction{
 		From:       input.From,
 		To:         input.To,
 		Amount:     input.Amount, // Full amount recipient receives
-		Fee:        txFee,        // Fee paid to miner
 		Status:     "pending",
 		Timestamp:  utils.GetTimestamp(),
 		IsCoinbase: false,
 	}
+
+	txFee := handler.Node.Blockchain.Mempool.CalculateFee(&newTx)
+
+	newTx.Fee = txFee
 
 	// Validate that the 'from' address matches the public key
 	derivedAddress, err := CryptoGraphy.DeriveAddressFromPublicKey(input.PublicKey)
