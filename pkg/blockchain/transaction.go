@@ -124,6 +124,7 @@ func CreateCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
 	}
 }
 
+// NewTransaction -> It`s for unit tests
 func NewTransaction(from, to string, amount uint64, timestamp int64) *Transaction {
 	return &Transaction{
 		From:      from,
