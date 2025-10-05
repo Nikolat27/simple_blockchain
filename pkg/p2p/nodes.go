@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"simple_blockchain/pkg/blockchain"
 	"simple_blockchain/pkg/p2p/resolver"
 	"simple_blockchain/pkg/p2p/types"
@@ -319,7 +320,12 @@ func (node *Node) getPeersList() []string {
 }
 
 func (node *Node) GetCurrentTcpAddress() string {
-	return "127.0.0.1" + node.TcpAddress
+	hostname := os.Getenv("NODE_HOSTNAME")
+	if hostname == "" {
+		hostname = "localhost"
+	}
+
+	return hostname + node.TcpAddress
 }
 
 func isTLS(conn net.Conn) bool {

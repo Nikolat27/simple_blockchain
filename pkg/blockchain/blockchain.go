@@ -13,7 +13,7 @@ import (
 )
 
 const MiningReward = 10000
-const Difficulty = 6
+const Difficulty = 5
 
 type Blockchain struct {
 	Blocks   []Block `json:"blocks"`
