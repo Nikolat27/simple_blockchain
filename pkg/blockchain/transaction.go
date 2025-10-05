@@ -1,11 +1,13 @@
 package blockchain
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"simple_blockchain/pkg/CryptoGraphy"
-	"time"
+	"simple_blockchain/pkg/utils"
 )
 
 const CoinbaseTxFee = 0
@@ -68,13 +70,67 @@ func (tx *Transaction) Verify() bool {
 	return CryptoGraphy.VerifySignature(tx.PublicKey, hash, tx.Signature)
 }
 
-func createCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
+func (tx *Transaction) Size() int {
+	var buf bytes.Buffer
+
+	writeBytes := func(b []byte) {
+		_ = binary.Write(&buf, binary.BigEndian, uint32(len(b)))
+		buf.Write(b)
+	}
+	writeString := func(s string) {
+		writeBytes([]byte(s))
+	}
+
+	// Variable-length strings (length-prefixed)
+	writeString(tx.From)
+	writeString(tx.To)
+	writeString(tx.PublicKey)
+
+	// Fixed-size numeric fields
+	_ = binary.Write(&buf, binary.BigEndian, tx.Amount)    // uint64
+	_ = binary.Write(&buf, binary.BigEndian, tx.Timestamp) // int64
+
+	// Signature: length-prefixed bytes
+	if tx.Signature != nil {
+		writeBytes(tx.Signature)
+	} else {
+		_ = binary.Write(&buf, binary.BigEndian, uint32(0))
+	}
+
+	// Fee is uint64, write 8 bytes
+	_ = binary.Write(&buf, binary.BigEndian, tx.Fee)
+
+	// Status string
+	writeString(tx.Status)
+
+	// Bool as single byte
+	if tx.IsCoinbase {
+		buf.WriteByte(1)
+	} else {
+		buf.WriteByte(0)
+	}
+
+	return buf.Len()
+}
+
+func CreateCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
 	return &Transaction{
 		To:         minerAddress,
 		Amount:     miningReward,
 		Fee:        CoinbaseTxFee,
-		Timestamp:  time.Now().UnixNano(),
+		Timestamp:  utils.GetTimestamp(),
 		Status:     "confirmed",
 		IsCoinbase: true,
+	}
+}
+
+// NewTransaction -> It`s for unit tests
+func NewTransaction(from, to string, amount uint64, timestamp int64) *Transaction {
+	return &Transaction{
+		From:      from,
+		To:        to,
+		Amount:    amount,
+		Timestamp: timestamp,
+		Status:    "pending",
 	}
 }

@@ -15,6 +15,8 @@ const (
 	MempoolBroadcastMsg = "mempool_broadcast_msg"
 
 	BlockBroadcastMsg = "block_broadcast_msg"
+
+	CancelMiningMsg = "cancel_mining_msg"
 )
 
 type Payload []byte

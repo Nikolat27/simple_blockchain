@@ -27,16 +27,15 @@ func main() {
 	}
 
 	dbDriverName := os.Getenv("DB_DRIVER_NAME")
-	dataSourceName := os.Getenv("DATA_SOURCE_NAME")
+	dataSourceName := *dbDSN
 
-	dataSourceName = *dbDSN
 	dbInstance, err := database.New(dbDriverName, dataSourceName)
 	if err != nil {
 		panic(err)
 	}
 	defer dbInstance.Close()
 
-	mempool := blockchain.NewMempool()
+	mempool := blockchain.NewMempool(1048576)
 
 	// Load or initialize blockchain
 	bc, err := blockchain.LoadBlockchain(dbInstance, mempool)

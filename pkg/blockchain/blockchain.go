@@ -13,22 +13,34 @@ import (
 )
 
 const MiningReward = 10000
-const Difficulty = 5
+const Difficulty = 6
 
 type Blockchain struct {
-	Blocks []Block `json:"blocks"`
-	Mutex  sync.RWMutex
-
+	Blocks   []Block `json:"blocks"`
 	Database *database.Database
 	Mempool  *Mempool `json:"mempool"`
+
+	CancelMiningCh chan bool
+
+	Mutex sync.RWMutex
 }
 
-func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
-	bc := &Blockchain{
+func initBlockchain(db *database.Database, mp *Mempool) *Blockchain {
+	return &Blockchain{
 		Blocks:   make([]Block, 0),
 		Database: db,
 		Mempool:  mp,
+
+		CancelMiningCh: make(chan bool, 1),
 	}
+}
+
+func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
+	if mp == nil {
+		return nil, errors.New("mempool instance is required")
+	}
+
+	bc := initBlockchain(db, mp)
 
 	genesisBlock, err := createGenesisBlock()
 	if err != nil {
@@ -55,11 +67,7 @@ func NewBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
 }
 
 func LoadBlockchain(db *database.Database, mp *Mempool) (*Blockchain, error) {
-	bc := &Blockchain{
-		Blocks:   make([]Block, 0),
-		Database: db,
-		Mempool:  mp,
-	}
+	bc := initBlockchain(db, mp)
 
 	blocks, err := bc.GetAllBlocks()
 	if err != nil {
@@ -121,6 +129,7 @@ func startFresh(db *database.Database) (*Blockchain, error) {
 	return &Blockchain{
 		Blocks:   make([]Block, 0),
 		Database: db,
+		Mempool:  NewMempool(1048576),
 	}, nil
 }
 
@@ -172,9 +181,6 @@ func (bc *Blockchain) AddTransactionToDB(dbTx *sql.Tx, blockId int, txs []Transa
 }
 
 func (bc *Blockchain) GetAllBlocks() ([]Block, error) {
-	bc.Mutex.RLock()
-	defer bc.Mutex.RUnlock()
-
 	rows, err := bc.Database.GetAllBlocks()
 	if err != nil {
 		return nil, err
@@ -272,33 +278,27 @@ func (bc *Blockchain) VerifyBlock(block *Block) (bool, error) {
 	}
 
 	if !bytes.Equal(prevBlock.Hash, tempBlock.PrevHash) {
-		return false, err
+		return false, fmt.Errorf("previous block hash mismatch for block %d", block.Id)
 	}
 
 	return hashMatches && tempBlock.IsValidHash(), nil
 }
 
 func (bc *Blockchain) GetBalance(address string) (uint64, error) {
-	mempoolTxs := bc.Mempool.GetTransactions()
+	mempoolTxs := bc.Mempool.GetTransactionsCopy()
 
 	confirmedBalance, err := bc.Database.GetConfirmedBalance(address)
 	if err != nil {
 		return 0, err
 	}
 
-	log.Println("Confirmed Balance: ", confirmedBalance)
-
 	pendingOutgoing := getUserPendingOutgoing(address, mempoolTxs)
-
-	log.Println("Pending outgoing: ", pendingOutgoing)
 
 	if confirmedBalance < pendingOutgoing {
 		return 0, nil
 	}
 
 	effectiveBalance := confirmedBalance - pendingOutgoing
-
-	log.Println("Effective balance: ", effectiveBalance)
 
 	return effectiveBalance, nil
 }
@@ -472,4 +472,15 @@ func (bc *Blockchain) AddBlockToMemory(block *Block) bool {
 
 	bc.Blocks = append(bc.Blocks, *block)
 	return true
+}
+
+func (bc *Blockchain) GetLatestBlock() *Block {
+	bc.Mutex.RLock()
+	defer bc.Mutex.RUnlock()
+
+	if len(bc.Blocks) == 0 {
+		return nil
+	}
+
+	return &bc.Blocks[len(bc.Blocks)-1]
 }

@@ -1,25 +1,26 @@
 package blockchain
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
-	"time"
+	"simple_blockchain/pkg/utils"
+	"sort"
 )
 
 func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddress string) (*Block, error) {
-	// Continuously mines new blocks until the operation is cancelled
 	select {
 	case <-ctx.Done():
 		fmt.Println("Mining cancelled")
 		return nil, nil
 	default:
-		transactions := mempool.GetTransactions()
+		transactions := mempool.GetTransactionsCopy()
 
 		// Priority based
-		sortedTxs := bc.Mempool.SortTxsByFee(transactions)
+		sortedTxs := sortTxsByFee(transactions)
 
-		coinBaseTx := createCoinbaseTx(minerAddress, MiningReward)
+		coinBaseTx := CreateCoinbaseTx(minerAddress, MiningReward)
 
 		allTransactions := append([]Transaction{*coinBaseTx}, sortedTxs...)
 
@@ -32,19 +33,28 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 			Id:           int64(blockIndex),
 			PrevHash:     prevHash,
 			Hash:         nil,
-			Timestamp:    time.Now().Unix(),
+			Timestamp:    utils.GetTimestamp(),
 			Transactions: allTransactions,
 			Nonce:        0,
 		}
 
 		// mining started...
-		mined, err := proofOfWork(ctx, newBlock)
+		mined, err := bc.proofOfWork(ctx, newBlock)
 		if err != nil {
 			return nil, fmt.Errorf("ERROR proofOfWork: %v", err)
 		}
 
 		if !mined {
 			fmt.Println("POW operation cancelled")
+			return nil, nil
+		}
+
+		bc.Mutex.RLock()
+		latestHash := getPreviousBlockHash(bc.Blocks)
+		bc.Mutex.RUnlock()
+
+		if !bytes.Equal(latestHash, newBlock.PrevHash) {
+			fmt.Println("Block was already mined by someone else")
 			return nil, nil
 		}
 
@@ -65,7 +75,7 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 
 		bc.AddBlockToMemory(newBlock)
 
-		mempool.Clear()
+		mempool.DeleteMinedTransactions(newBlock.Transactions)
 
 		log.Println("Mined a block")
 
@@ -73,11 +83,14 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 	}
 }
 
-func proofOfWork(ctx context.Context, block *Block) (bool, error) {
+func (bc *Blockchain) proofOfWork(ctx context.Context, block *Block) (bool, error) {
 	for {
 		select {
 		case <-ctx.Done():
 			// cancelled
+			return false, nil
+		case <-bc.CancelMiningCh:
+			// mined or cancelled
 			return false, nil
 		default:
 			if err := block.HashBlock(); err != nil {
@@ -102,4 +115,18 @@ func getPreviousBlockHash(blocks []Block) []byte {
 	}
 
 	return prevHash
+}
+
+// sortTxsByFee sorts transactions in descending order by their fee
+func sortTxsByFee(txs map[string]Transaction) []Transaction {
+	sortedTxs := make([]Transaction, 0, len(txs))
+	for _, tx := range txs {
+		sortedTxs = append(sortedTxs, tx)
+	}
+
+	sort.Slice(sortedTxs, func(i, j int) bool {
+		return sortedTxs[i].Fee > sortedTxs[j].Fee
+	})
+
+	return sortedTxs
 }

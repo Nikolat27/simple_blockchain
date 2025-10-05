@@ -5,7 +5,6 @@ import (
 	"simple_blockchain/pkg/CryptoGraphy"
 	"simple_blockchain/pkg/blockchain"
 	"simple_blockchain/pkg/utils"
-	"time"
 )
 
 func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) {
@@ -27,16 +26,22 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	txFee := handler.Node.Blockchain.Mempool.CalculateFee(input.Amount)
-
 	newTx := blockchain.Transaction{
 		From:       input.From,
 		To:         input.To,
 		Amount:     input.Amount, // Full amount recipient receives
-		Fee:        txFee,        // Fee paid to miner
 		Status:     "pending",
-		Timestamp:  time.Now().UTC().Unix(),
+		Timestamp:  utils.GetTimestamp(),
 		IsCoinbase: false,
+	}
+
+	txFee := handler.Node.Blockchain.Mempool.CalculateFee(&newTx)
+
+	newTx.Fee = txFee
+
+	if handler.Node.Blockchain.Mempool.WillExceedCapacity(&newTx) {
+		utils.WriteJSON(w, http.StatusBadRequest, "Mempool capacity exceeded. Try again later")
+		return
 	}
 
 	// Validate that the 'from' address matches the public key
@@ -76,18 +81,19 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 	}
 
 	resp := map[string]any{
-		"message":    "Transaction added to mempool",
-		"amount":     input.Amount,         // Amount recipient receives
-		"fee":        txFee,                // Fee paid to miner
-		"total_cost": input.Amount + txFee, // Total cost to sender
-		"status":     "pending",
+		"transaction_hash": newTx.Hash().EncodeToString(),
+		"message":          "Transaction added to mempool",
+		"amount":           input.Amount,         // Amount recipient receives
+		"fee":              txFee,                // Fee paid to miner
+		"total_cost":       input.Amount + txFee, // Total cost to sender
+		"status":           "pending",
 	}
 
 	utils.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (handler *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
-	transactions := handler.Node.Blockchain.Mempool.GetTransactions()
+	transactions := handler.Node.Blockchain.Mempool.GetTransactionsCopy()
 
 	resp := map[string]any{
 		"transactions": transactions,

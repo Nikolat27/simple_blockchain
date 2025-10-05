@@ -18,6 +18,9 @@ run-node3:
 build:
 	@go build -o blockchain-node ./cmd/main.go
 
+run-tests:
+	@go test ./... -v
+
 view-leveldb:
 	@leveldb-viewer -db balances
 

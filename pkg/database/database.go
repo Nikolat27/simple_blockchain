@@ -8,7 +8,7 @@ import (
 )
 
 type Database struct {
-	db *sql.DB
+	DB *sql.DB
 }
 
 func New(driverName, dataSourceName string) (*Database, error) {
@@ -26,18 +26,18 @@ func New(driverName, dataSourceName string) (*Database, error) {
 	}
 
 	return &Database{
-		db: db,
+		DB: db,
 	}, nil
 }
 
 func (db *Database) Close() error {
-	return db.db.Close()
+	return db.DB.Close()
 }
 
 func (db *Database) Version() (string, error) {
 	var version string
 
-	if err := db.db.QueryRow("SELECT sqlite_version()").Scan(&version); err != nil {
+	if err := db.DB.QueryRow("SELECT sqlite_version()").Scan(&version); err != nil {
 		return "", err
 	}
 
@@ -46,7 +46,7 @@ func (db *Database) Version() (string, error) {
 
 // BeginTx -> For isolation level
 func (db *Database) BeginTx() (*sql.Tx, error) {
-	return db.db.Begin()
+	return db.DB.Begin()
 }
 
 // ClearAllData -> Flush the database

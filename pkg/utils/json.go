@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 )
 
@@ -16,7 +17,7 @@ func ParseJSON(r *http.Request, maxBytes int64, input any) error {
 		return err
 	}
 
-	return json.Unmarshal(data, &input)
+	return json.Unmarshal(data, input)
 }
 
 func WriteJSON(w http.ResponseWriter, statusCode int, message any) {
@@ -30,5 +31,12 @@ func WriteJSON(w http.ResponseWriter, statusCode int, message any) {
 
 	if err := json.NewEncoder(w).Encode(message); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		fallback := map[string]string{
+			"error": "failed to encode the response",
+		}
+
+		if err := json.NewEncoder(w).Encode(fallback); err != nil {
+			log.Println(err)
+		}
 	}
 }

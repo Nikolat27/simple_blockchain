@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -21,7 +22,7 @@ type Node struct {
 	Blockchain *blockchain.Blockchain `json:"blockchain"`
 	payloadCh  chan types.Payload     // Communication channel
 
-	mutex sync.RWMutex
+	Mutex sync.RWMutex
 }
 
 // SetupNode -> Node
@@ -96,12 +97,12 @@ func (node *Node) ConnectAndSync(ctx context.Context, peerAddress string) error 
 
 		fmt.Printf("Successfully synced %d blocks with peer: %s\n", len(headers), peerAddress)
 		return node.AddNewPeer(peerAddress)
+	case <-time.After(60 * time.Second):
+		return errors.New("ERROR get payload Timeout exceeded")
 	}
 }
 
-func (node *Node) DownloadMissingBlocks(ctx context.Context, peerAddress string,
-	headers []blockchain.BlockHeader) error {
-
+func (node *Node) DownloadMissingBlocks(ctx context.Context, peerAddress string, headers []blockchain.BlockHeader) error {
 	localBlocks, err := node.Blockchain.GetAllBlocks()
 	if err != nil {
 		return err
@@ -151,6 +152,19 @@ func (node *Node) downloadBlock(ctx context.Context, peerAddress string, blockId
 			return fmt.Errorf("received block ID mismatch: expected %d, got %d", blockId, block.Id)
 		}
 
+		valid, err := node.Blockchain.VerifyBlock(&block)
+		if err != nil {
+			return err
+		}
+
+		if !valid {
+			return fmt.Errorf("received invalid block %d", blockId)
+		}
+
+		if err := node.verifyBlockTransactions(&block); err != nil {
+			return fmt.Errorf("block %d contains invalid transactions: %w", blockId, err)
+		}
+
 		sqlTx, err := node.Blockchain.Database.BeginTx()
 		if err != nil {
 			return err
@@ -169,6 +183,8 @@ func (node *Node) downloadBlock(ctx context.Context, peerAddress string, blockId
 		node.Blockchain.AddBlockToMemory(&block)
 
 		return nil
+	case <-time.After(60 * time.Second):
+		return errors.New("ERROR get block payload timeout exceeded")
 	}
 }
 
@@ -220,6 +236,14 @@ func (node *Node) WriteMessage(ctx context.Context, peerAddress string, msg []by
 	return nil
 }
 
+func (node *Node) CancelMining() error {
+	newMessage := types.NewMessage(types.CancelMiningMsg, node.GetCurrentTcpAddress(), types.Payload{})
+
+	node.sendToAllPeers(newMessage.Marshal())
+
+	return nil
+}
+
 func (node *Node) BroadcastBlock(block *blockchain.Block) error {
 	payload, err := json.Marshal(block)
 	if err != nil {
@@ -234,7 +258,7 @@ func (node *Node) BroadcastBlock(block *blockchain.Block) error {
 }
 
 func (node *Node) BroadcastMempool(mempool *blockchain.Mempool) error {
-	payload, err := json.Marshal(mempool)
+	var payload, err = json.Marshal(mempool)
 	if err != nil {
 		return fmt.Errorf("failed to marshal block: %w", err)
 	}
@@ -247,9 +271,11 @@ func (node *Node) BroadcastMempool(mempool *blockchain.Mempool) error {
 }
 
 func (node *Node) sendToAllPeers(newMessage []byte) {
+	peersList := node.getPeersList()
+
 	fmt.Println("available peers: ", node.Peers)
 
-	for _, peerAddr := range node.Peers {
+	for _, peerAddr := range peersList {
 		if peerAddr == node.GetCurrentTcpAddress() {
 			continue
 		}
@@ -263,6 +289,17 @@ func (node *Node) sendToAllPeers(newMessage []byte) {
 			}
 		}(peerAddr)
 	}
+}
+
+func (node *Node) getPeersList() []string {
+	node.Mutex.RLock()
+
+	peersList := make([]string, len(node.Peers))
+	copy(peersList, node.Peers)
+
+	node.Mutex.RUnlock()
+
+	return peersList
 }
 
 func (node *Node) GetCurrentTcpAddress() string {

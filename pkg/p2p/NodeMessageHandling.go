@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"simple_blockchain/pkg/CryptoGraphy"
 	"simple_blockchain/pkg/blockchain"
 	"simple_blockchain/pkg/p2p/types"
 	"slices"
@@ -36,8 +37,9 @@ func (node *Node) handleGetBlockHeaders(requestorAddr string) error {
 		return err
 	}
 
-	msg := types.NewMessage(types.SendBlockHeadersMsg, node.GetCurrentTcpAddress(), payload)
-	return node.WriteMessage(ctx, requestorAddr, msg.Marshal())
+	newMessage := types.NewMessage(types.SendBlockHeadersMsg, node.GetCurrentTcpAddress(), payload)
+
+	return node.WriteMessage(ctx, requestorAddr, newMessage.Marshal())
 }
 
 func (node *Node) handleGetBlock(requestorAddr string, blockId int64) error {
@@ -78,6 +80,37 @@ func (node *Node) handleGetBlockchainData(requestorAddr string) error {
 	return node.WriteMessage(ctx, requestorAddr, msg.Marshal())
 }
 
+func (node *Node) verifyBlockTransactions(block *blockchain.Block) error {
+	for _, tx := range block.Transactions {
+		if tx.IsCoinbase {
+			continue
+		}
+
+		if !tx.Verify() {
+			return fmt.Errorf("transaction %x has invalid signature", tx.Hash())
+		}
+
+		derivedAddress, err := CryptoGraphy.DeriveAddressFromPublicKey(tx.PublicKey)
+		if err != nil {
+			return err
+		}
+
+		if derivedAddress != tx.From {
+			return fmt.Errorf("transaction %x sender address mismatch", tx.Hash())
+		}
+
+		if tx.Amount == 0 {
+			return fmt.Errorf("transaction %x has zero amount", tx.Hash())
+		}
+
+		if tx.Amount+tx.Fee <= 0 {
+			return fmt.Errorf("transaction %x has invalid amount/fee combination", tx.Hash())
+		}
+	}
+
+	return nil
+}
+
 // handleBlockBroadcasting -> Propose the new block
 func (node *Node) handleBlockBroadcasting(payload types.Payload) error {
 	var block blockchain.Block
@@ -96,6 +129,10 @@ func (node *Node) handleBlockBroadcasting(payload types.Payload) error {
 		return errors.New("block is corrupted")
 	}
 
+	if err := node.verifyBlockTransactions(&block); err != nil {
+		return fmt.Errorf("block contains invalid transactions: %w", err)
+	}
+
 	sqlTx, err := node.Blockchain.Database.BeginTx()
 	if err != nil {
 		return err
@@ -111,6 +148,8 @@ func (node *Node) handleBlockBroadcasting(payload types.Payload) error {
 	}
 
 	node.Blockchain.AddBlockToMemory(&block)
+
+	node.Blockchain.Mempool.DeleteMinedTransactions(block.Transactions)
 
 	return nil
 }
@@ -129,10 +168,20 @@ func (node *Node) handleMempoolBroadcasting(payload types.Payload) error {
 	return nil
 }
 
+func (node *Node) handleCancelMining() error {
+	log.Println("handleCancelMining Current Node: ", node.GetCurrentTcpAddress())
+
+	node.Blockchain.CancelMiningCh <- true
+
+	return nil
+}
+
 func (node *Node) AddNewPeer(newPeerAddress string) error {
+	node.Mutex.RLock()
 	if slices.Contains(node.Peers, newPeerAddress) {
 		return nil
 	}
+	node.Mutex.RUnlock()
 
 	sqlTx, err := node.Blockchain.Database.BeginTx()
 	if err != nil {
@@ -148,14 +197,13 @@ func (node *Node) AddNewPeer(newPeerAddress string) error {
 		return err
 	}
 
+	node.Mutex.Lock()
 	node.addPeerToMemory(newPeerAddress)
+	node.Mutex.Unlock()
 
 	return nil
 }
 
 func (node *Node) addPeerToMemory(newPeer string) {
-	node.mutex.Lock()
-	defer node.mutex.Unlock()
-
 	node.Peers = append(node.Peers, newPeer)
 }

@@ -44,6 +44,9 @@ func (node *Node) parseMessage(senderMsg []byte) error {
 	case types.MempoolBroadcastMsg:
 		return node.handleMempoolBroadcasting(msg.Payload)
 
+	case types.CancelMiningMsg:
+		return node.handleCancelMining()
+
 	default:
 		fmt.Println("meow meow")
 	}
