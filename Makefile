@@ -14,7 +14,6 @@ run-node3:
 	cp blockchain_db.sqlite node3_blockchain_db.sqlite
 	go run cmd/main.go --port=5001 --node-port=7001 --dsn=node3_blockchain_db.sqlite
 
-
 build:
 	@go build -o blockchain-node ./cmd/main.go
 
