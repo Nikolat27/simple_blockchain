@@ -25,7 +25,7 @@ func (db *Database) GetTransactionsByBlockId(blockId int) ([]DBTransactionSchema
 			ORDER BY id
 		`
 
-	rows, err := db.db.Query(query, blockId)
+	rows, err := db.DB.Query(query, blockId)
 	if err != nil {
 		return nil, err
 	}

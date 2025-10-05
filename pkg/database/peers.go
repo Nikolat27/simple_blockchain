@@ -23,11 +23,11 @@ func (db *Database) GetPeers() (*sql.Rows, error) {
 		SELECT tcp_address FROM peers;
 	`
 
-	return db.db.Query(query)
+	return db.DB.Query(query)
 }
 
 func (db *Database) LoadPeers() ([]string, error) {
-	rows, err := db.db.Query("SELECT tcp_address FROM peers")
+	rows, err := db.DB.Query("SELECT tcp_address FROM peers")
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (db *Database) PeerExist(tcpAddress string) (bool, error) {
 	`
 
 	var exists int
-	if err := db.db.QueryRow(query, tcpAddress).Scan(&exists); err != nil {
+	if err := db.DB.QueryRow(query, tcpAddress).Scan(&exists); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}

@@ -14,7 +14,7 @@ func (db *Database) GetConfirmedBalance(address string) (uint64, error) {
 	`
 
 	var balance uint64
-	if err := db.db.QueryRow(query, address).Scan(&balance); err != nil {
+	if err := db.DB.QueryRow(query, address).Scan(&balance); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, nil
 		}

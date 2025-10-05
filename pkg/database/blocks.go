@@ -30,7 +30,7 @@ func (db *Database) GetAllBlocks() (*sql.Rows, error) {
 			FROM blocks ORDER BY block_height
 		`
 
-	rows, err := db.db.Query(query)
+	rows, err := db.DB.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (db *Database) GetBlocksCount() (int64, error) {
 	`
 
 	var count int64
-	if err := db.db.QueryRow(query).Scan(&count); err != nil {
+	if err := db.DB.QueryRow(query).Scan(&count); err != nil {
 		return 0, err
 	}
 
@@ -60,10 +60,10 @@ func (db *Database) GetBlockById(blockId int64) (*sql.Row, error) {
 	var count int
 	countQuery := `SELECT COUNT(*) FROM blocks WHERE block_height = ?`
 
-	if err := db.db.QueryRow(countQuery, blockId).Scan(&count); err != nil {
+	if err := db.DB.QueryRow(countQuery, blockId).Scan(&count); err != nil {
 		return nil, err
 	}
 
-	row := db.db.QueryRow(query, blockId)
+	row := db.DB.QueryRow(query, blockId)
 	return row, nil
 }
