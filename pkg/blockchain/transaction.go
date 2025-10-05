@@ -113,7 +113,7 @@ func (tx *Transaction) Size() int {
 	return buf.Len()
 }
 
-func createCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
+func CreateCoinbaseTx(minerAddress string, miningReward uint64) *Transaction {
 	return &Transaction{
 		To:         minerAddress,
 		Amount:     miningReward,

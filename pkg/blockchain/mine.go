@@ -20,7 +20,7 @@ func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddr
 		// Priority based
 		sortedTxs := sortTxsByFee(transactions)
 
-		coinBaseTx := createCoinbaseTx(minerAddress, MiningReward)
+		coinBaseTx := CreateCoinbaseTx(minerAddress, MiningReward)
 
 		allTransactions := append([]Transaction{*coinBaseTx}, sortedTxs...)
 
