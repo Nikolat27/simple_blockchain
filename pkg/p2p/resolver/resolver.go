@@ -1,9 +1,14 @@
 package resolver
 
-var dnsSeeds = []string{
-	"127.0.0.1:8080",
-}
+import (
+	"os"
+	"strings"
+)
 
 func ResolveSeedNodes() []string {
+	seedNodes := os.Getenv("SEED_NODES")
+
+	dnsSeeds := strings.Split(seedNodes, ",")
+
 	return dnsSeeds
 }

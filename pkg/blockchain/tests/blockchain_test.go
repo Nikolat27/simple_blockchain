@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"simple_blockchain/pkg/CryptoGraphy"
-	"simple_blockchain/pkg/blockchain"
-	"simple_blockchain/pkg/database"
-	"simple_blockchain/pkg/utils"
 	"testing"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/CryptoGraphy"
+	"github.com/Nikolat27/simple_blockchain/pkg/blockchain"
+	"github.com/Nikolat27/simple_blockchain/pkg/database"
+	"github.com/Nikolat27/simple_blockchain/pkg/utils"
 )
 
 // setupTestDB creates a temporary test database

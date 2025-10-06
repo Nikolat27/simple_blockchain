@@ -6,8 +6,9 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
-	"simple_blockchain/pkg/CryptoGraphy"
-	"simple_blockchain/pkg/utils"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/CryptoGraphy"
+	"github.com/Nikolat27/simple_blockchain/pkg/utils"
 )
 
 const CoinbaseTxFee = 0

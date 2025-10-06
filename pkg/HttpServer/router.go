@@ -1,7 +1,7 @@
 package HttpServer
 
 import (
-	"simple_blockchain/pkg/handler"
+	"github.com/Nikolat27/simple_blockchain/pkg/handler"
 
 	"github.com/go-chi/chi/v5"
 )

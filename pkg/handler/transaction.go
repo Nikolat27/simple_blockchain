@@ -2,11 +2,37 @@ package handler
 
 import (
 	"net/http"
-	"simple_blockchain/pkg/CryptoGraphy"
-	"simple_blockchain/pkg/blockchain"
-	"simple_blockchain/pkg/utils"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/CryptoGraphy"
+	"github.com/Nikolat27/simple_blockchain/pkg/blockchain"
+	"github.com/Nikolat27/simple_blockchain/pkg/utils"
 )
 
+// SendTransaction handles POST /api/tx/send requests.
+// Creates, signs, validates, and broadcasts a new transaction to the network.
+//
+// Request body (JSON):
+//
+//	{
+//	  "from": "address",        // Sender's wallet address
+//	  "to": "address",          // Recipient's wallet address
+//	  "amount": 1000,           // Amount to transfer
+//	  "private_key": "hex",     // Sender's private key (hex encoded)
+//	  "public_key": "hex"       // Sender's public key (hex encoded)
+//	}
+//
+// Response: 200 OK with JSON body:
+//
+//	{
+//	  "transaction_hash": "hex",  // Hash of the transaction
+//	  "message": "...",           // Success message
+//	  "amount": 1000,             // Amount recipient receives
+//	  "fee": 10,                  // Fee paid to miner
+//	  "total_cost": 1010,         // Total deducted from sender
+//	  "status": "pending"
+//	}
+//
+// Response: 400 Bad Request if validation fails or insufficient balance
 func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		From       string `json:"from"`
@@ -92,6 +118,15 @@ func (handler *Handler) SendTransaction(w http.ResponseWriter, r *http.Request) 
 	utils.WriteJSON(w, http.StatusOK, resp)
 }
 
+// GetTransactions handles GET /api/txs requests.
+// Returns all pending transactions currently in the mempool.
+//
+// Response: 200 OK with JSON body:
+//
+//	{
+//	  "transactions": {...},  // Map of transaction hash to transaction object
+//	  "count": 5              // Number of pending transactions
+//	}
 func (handler *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) {
 	transactions := handler.Node.Blockchain.Mempool.GetTransactionsCopy()
 
@@ -103,6 +138,16 @@ func (handler *Handler) GetTransactions(w http.ResponseWriter, r *http.Request) 
 	utils.WriteJSON(w, http.StatusOK, resp)
 }
 
+// GetCurrentTxFee handles GET /api/tx/fee requests.
+// Returns the current transaction fee rate based on mempool congestion.
+//
+// Response: 200 OK with JSON body:
+//
+//	{
+//	  "current_fee_percentage": 0.1,  // Fee as percentage (e.g., 0.1 = 0.1%)
+//	  "current_fee_basis": 10,        // Fee basis points (e.g., 10 = 0.1%)
+//	  "description": "..."            // Explanation of fee calculation
+//	}
 func (handler *Handler) GetCurrentTxFee(w http.ResponseWriter, r *http.Request) {
 	txFee := handler.Node.Blockchain.Mempool.CalculateTxFee()
 

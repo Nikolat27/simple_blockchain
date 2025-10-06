@@ -2,8 +2,9 @@ package test
 
 import (
 	"encoding/json"
-	"simple_blockchain/pkg/p2p/types"
 	"testing"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/p2p/types"
 )
 
 // TestNewMessage tests creating a new message
@@ -60,7 +61,7 @@ func TestMessage_Marshal(t *testing.T) {
 func TestMessage_MarshalUnmarshal(t *testing.T) {
 	original := types.NewMessage(
 		types.BlockBroadcastMsg,
-		"127.0.0.1:9000",
+		"localhost:9000",
 		types.Payload([]byte(`{"block_id":123}`)),
 	)
 

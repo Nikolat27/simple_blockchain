@@ -9,11 +9,13 @@ import (
 	"io"
 	"log"
 	"net"
-	"simple_blockchain/pkg/blockchain"
-	"simple_blockchain/pkg/p2p/resolver"
-	"simple_blockchain/pkg/p2p/types"
+	"os"
 	"sync"
 	"time"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/blockchain"
+	"github.com/Nikolat27/simple_blockchain/pkg/p2p/resolver"
+	"github.com/Nikolat27/simple_blockchain/pkg/p2p/types"
 )
 
 type Node struct {
@@ -123,6 +125,7 @@ func (node *Node) DownloadMissingBlocks(ctx context.Context, peerAddress string,
 	}
 
 	downloaded := 0
+
 	for _, header := range headers {
 		if localBlockIds[header.Id] {
 			continue
@@ -211,6 +214,10 @@ func (node *Node) startListening(tcpListener net.Listener) error {
 // handleListening -> Node must consistently listen (read) to the TCP TLS connection
 func (node *Node) handleListening(conn net.Conn) {
 	defer conn.Close()
+
+	if !isTLS(conn) {
+		log.Println("connection is not TLS")
+	}
 
 	data, err := io.ReadAll(conn)
 	if err != nil {
@@ -315,5 +322,15 @@ func (node *Node) getPeersList() []string {
 }
 
 func (node *Node) GetCurrentTcpAddress() string {
-	return "127.0.0.1" + node.TcpAddress
+	hostname := os.Getenv("NODE_HOSTNAME")
+	if hostname == "" {
+		hostname = "localhost"
+	}
+
+	return hostname + node.TcpAddress
+}
+
+func isTLS(conn net.Conn) bool {
+	_, ok := conn.(*tls.Conn)
+	return ok
 }

@@ -3,9 +3,24 @@ package handler
 import (
 	"fmt"
 	"net/http"
-	"simple_blockchain/pkg/utils"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/utils"
 )
 
+// MineBlock handles POST /api/mine requests.
+// Mines a new block containing pending transactions from the mempool.
+// Uses proof-of-work to find a valid block hash and broadcasts it to the network.
+//
+// Request body (JSON):
+//
+//	{
+//	  "miner_address": "address"  // Address to receive mining reward
+//	}
+//
+// Response: 200 OK with mined block object
+// Response: 400 Bad Request if mining fails or validation errors occur
+// Response: 409 Conflict if mining was cancelled or block already mined
+// Response: 500 Internal Server Error if broadcast fails
 func (handler *Handler) MineBlock(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		MinerAddress string `json:"miner_address"`

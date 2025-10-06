@@ -8,12 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"simple_blockchain/pkg/database"
 	"sync"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/database"
 )
 
 const MiningReward = 10000
-const Difficulty = 6
+const Difficulty = 5
 
 type Blockchain struct {
 	Blocks   []Block `json:"blocks"`

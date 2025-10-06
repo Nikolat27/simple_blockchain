@@ -1,4 +1,4 @@
-module simple_blockchain
+module github.com/Nikolat27/simple_blockchain
 
 go 1.24.0
 

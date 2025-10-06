@@ -5,8 +5,9 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"simple_blockchain/pkg/utils"
 	"sort"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/utils"
 )
 
 func (bc *Blockchain) MineBlock(ctx context.Context, mempool *Mempool, minerAddress string) (*Block, error) {

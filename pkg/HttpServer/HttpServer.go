@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"simple_blockchain/pkg/handler"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/handler"
 )
 
 type HttpServer struct {

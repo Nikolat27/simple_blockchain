@@ -3,8 +3,9 @@ package tests
 import (
 	"crypto/ed25519"
 	"encoding/hex"
-	"simple_blockchain/pkg/CryptoGraphy"
 	"testing"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/CryptoGraphy"
 )
 
 // TestGenerateKeyPair tests the generation of a new key pair
