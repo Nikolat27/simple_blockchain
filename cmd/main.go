@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"simple_blockchain/pkg/HttpServer"
-	"simple_blockchain/pkg/blockchain"
-	"simple_blockchain/pkg/database"
-	"simple_blockchain/pkg/handler"
-	"simple_blockchain/pkg/p2p"
-	"simple_blockchain/pkg/utils"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/HttpServer"
+	"github.com/Nikolat27/simple_blockchain/pkg/blockchain"
+	"github.com/Nikolat27/simple_blockchain/pkg/database"
+	"github.com/Nikolat27/simple_blockchain/pkg/handler"
+	"github.com/Nikolat27/simple_blockchain/pkg/p2p"
+	"github.com/Nikolat27/simple_blockchain/pkg/utils"
 )
 
 func main() {

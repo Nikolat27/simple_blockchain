@@ -6,11 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"simple_blockchain/pkg/CryptoGraphy"
-	"simple_blockchain/pkg/blockchain"
-	"simple_blockchain/pkg/p2p/types"
 	"slices"
 	"time"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/CryptoGraphy"
+	"github.com/Nikolat27/simple_blockchain/pkg/blockchain"
+	"github.com/Nikolat27/simple_blockchain/pkg/p2p/types"
 )
 
 func (node *Node) handleGetBlockHeaders(requestorAddr string) error {

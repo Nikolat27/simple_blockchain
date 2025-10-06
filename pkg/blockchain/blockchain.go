@@ -8,8 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"simple_blockchain/pkg/database"
 	"sync"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/database"
 )
 
 const MiningReward = 10000

@@ -1,9 +1,10 @@
 package tests
 
 import (
-	"simple_blockchain/pkg/blockchain"
 	"testing"
 	"time"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/blockchain"
 )
 
 func TestAddTxMempool(t *testing.T) {

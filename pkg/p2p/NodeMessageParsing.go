@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"simple_blockchain/pkg/p2p/types"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/p2p/types"
 )
 
 func (node *Node) parseMessage(senderMsg []byte) error {

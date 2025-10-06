@@ -10,11 +10,12 @@ import (
 	"log"
 	"net"
 	"os"
-	"simple_blockchain/pkg/blockchain"
-	"simple_blockchain/pkg/p2p/resolver"
-	"simple_blockchain/pkg/p2p/types"
 	"sync"
 	"time"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/blockchain"
+	"github.com/Nikolat27/simple_blockchain/pkg/p2p/resolver"
+	"github.com/Nikolat27/simple_blockchain/pkg/p2p/types"
 )
 
 type Node struct {
@@ -124,6 +125,7 @@ func (node *Node) DownloadMissingBlocks(ctx context.Context, peerAddress string,
 	}
 
 	downloaded := 0
+
 	for _, header := range headers {
 		if localBlockIds[header.Id] {
 			continue

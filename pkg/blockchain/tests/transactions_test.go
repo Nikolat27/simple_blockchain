@@ -1,9 +1,10 @@
 package tests
 
 import (
-	"simple_blockchain/pkg/CryptoGraphy"
-	"simple_blockchain/pkg/blockchain"
 	"testing"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/CryptoGraphy"
+	"github.com/Nikolat27/simple_blockchain/pkg/blockchain"
 )
 
 func TestTx_Hash(t *testing.T) {

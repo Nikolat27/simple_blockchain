@@ -6,9 +6,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"simple_blockchain/pkg/database"
-	"simple_blockchain/pkg/utils"
 	"strings"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/database"
+	"github.com/Nikolat27/simple_blockchain/pkg/utils"
 )
 
 type Block struct {

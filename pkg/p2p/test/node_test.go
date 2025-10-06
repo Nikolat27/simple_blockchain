@@ -8,14 +8,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"simple_blockchain/pkg/CryptoGraphy"
-	"simple_blockchain/pkg/blockchain"
-	"simple_blockchain/pkg/database"
-	"simple_blockchain/pkg/p2p"
-	"simple_blockchain/pkg/p2p/types"
-	"simple_blockchain/pkg/utils"
 	"testing"
 	"time"
+
+	"github.com/Nikolat27/simple_blockchain/pkg/CryptoGraphy"
+	"github.com/Nikolat27/simple_blockchain/pkg/blockchain"
+	"github.com/Nikolat27/simple_blockchain/pkg/database"
+	"github.com/Nikolat27/simple_blockchain/pkg/p2p"
+	"github.com/Nikolat27/simple_blockchain/pkg/p2p/types"
+	"github.com/Nikolat27/simple_blockchain/pkg/utils"
 )
 
 func initTls() (*tls.Config, error) {
@@ -120,8 +121,7 @@ func TestNode_GetCurrentTcpAddress(t *testing.T) {
 		t.Error("TCP address should not be empty")
 	}
 
-	// Should start with 127.0.0.1
-	expected := "127.0.0.1:9000"
+	expected := "localhost:9000"
 	if address != expected {
 		t.Errorf("Expected address %s, got %s", expected, address)
 	}

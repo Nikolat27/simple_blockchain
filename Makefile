@@ -20,9 +20,6 @@ build:
 run-tests:
 	@go test ./... -v
 
-view-leveldb:
-	@leveldb-viewer -db balances
-
 reset-db:
 	sudo rm -f blockchain_db.sqlite
 
@@ -34,3 +31,10 @@ rollback:
 
 tls-cert:
 	openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/C=US/ST=State/L=City/O=Org/CN=localhost"
+
+godoc:
+	@echo "Starting godoc server..."
+	@echo "Documentation will be available at:"
+	@echo "  http://localhost:6060/pkg/github.com/Nikolat27/simple_blockchain/pkg/handler/"
+	@echo ""
+	@godoc -http=:6060
